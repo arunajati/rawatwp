@@ -581,18 +581,32 @@ class AdminPages {
 					<?php submit_button( 'Scan Available Packages', 'secondary' ); ?>
 				</form>
 
-				<h2>Daftar Package</h2>
-				<form id="rawatwp-bulk-delete-packages" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File ZIP dan data package akan dihapus permanen.');">
-					<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
-					<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
-					<select name="bulk_action" required>
-						<option value="">Bulk Actions</option>
-						<option value="delete">Delete</option>
-					</select>
-					<button class="button action" type="submit">Apply</button>
-				</form>
+					<h2>Daftar Package</h2>
+					<style>
+					.rawatwp-package-bulk-actions {
+						display: flex;
+						align-items: center;
+						gap: 8px;
+						margin: 0 0 14px 0;
+					}
+					.rawatwp-package-bulk-actions select {
+						min-width: 180px;
+					}
+					.rawatwp-package-table {
+						margin-top: 0;
+					}
+					</style>
+					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File ZIP dan data package akan dihapus permanen.');">
+						<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
+						<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
+						<select name="bulk_action" required>
+							<option value="">Bulk Actions</option>
+							<option value="delete">Delete</option>
+						</select>
+						<button class="button action" type="submit">Apply</button>
+					</form>
 
-				<table class="widefat striped">
+					<table class="widefat striped rawatwp-package-table">
 					<thead>
 						<tr>
 							<th style="width:40px;">
