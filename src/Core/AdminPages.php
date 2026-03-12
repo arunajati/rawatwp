@@ -189,7 +189,8 @@ class AdminPages {
 		$check_url = wp_nonce_url(
 			add_query_arg(
 				array(
-					'action' => 'rawatwp_check_update_now',
+					'action'      => 'rawatwp_check_update_now',
+					'redirect_to' => admin_url( 'plugins.php' ),
 				),
 				admin_url( 'admin-post.php' )
 			),
@@ -1511,13 +1512,38 @@ class AdminPages {
 	 */
 	public function handle_check_update_now() {
 		$this->assert_admin_post( 'rawatwp_check_update_now' );
+		$redirect_url = $this->get_requested_redirect_url();
 
 		$result = $this->github_updater->force_check_now();
 		if ( is_wp_error( $result ) ) {
+			if ( '' !== $redirect_url ) {
+				$this->redirect_to_url_with_notice( $redirect_url, '', $result->get_error_message() );
+			}
 			$this->redirect_with_notice( 'rawatwp-general', '', $result->get_error_message() );
 		}
 
+		if ( '' !== $redirect_url ) {
+			$this->redirect_to_url_with_notice( $redirect_url, 'Cek update selesai. Jika ada versi baru, silakan update dari halaman Plugins.', '' );
+		}
 		$this->redirect_with_notice( 'rawatwp-general', 'Cek update selesai. Lihat menu Plugins untuk update RawatWP jika tersedia.', '' );
+	}
+
+	/**
+	 * Render success/error notice on Plugins page after check update action.
+	 *
+	 * @return void
+	 */
+	public function render_plugins_page_notices() {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		global $pagenow;
+		if ( 'plugins.php' !== $pagenow ) {
+			return;
+		}
+
+		$this->render_notices();
 	}
 
 	/**
@@ -1596,6 +1622,47 @@ class AdminPages {
 
 		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/**
+	 * Redirect to arbitrary admin URL with success/error notice query args.
+	 *
+	 * @param string $url Target URL.
+	 * @param string $notice Notice text.
+	 * @param string $error Error text.
+	 * @return void
+	 */
+	private function redirect_to_url_with_notice( $url, $notice, $error ) {
+		$args = array();
+		if ( '' !== $notice ) {
+			$args['rawatwp_notice'] = $notice;
+		}
+		if ( '' !== $error ) {
+			$args['rawatwp_error'] = $error;
+		}
+
+		wp_safe_redirect( add_query_arg( $args, $url ) );
+		exit;
+	}
+
+	/**
+	 * Read and validate optional redirect target from request.
+	 *
+	 * @return string
+	 */
+	private function get_requested_redirect_url() {
+		$redirect_to = isset( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( (string) $_REQUEST['redirect_to'] ) ) : '';
+		if ( '' === $redirect_to ) {
+			return '';
+		}
+
+		$fallback = admin_url( 'plugins.php' );
+		$valid    = wp_validate_redirect( $redirect_to, $fallback );
+		if ( 0 !== strpos( $valid, admin_url() ) ) {
+			return $fallback;
+		}
+
+		return $valid;
 	}
 
 	/**
