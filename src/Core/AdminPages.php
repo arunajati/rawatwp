@@ -380,43 +380,85 @@ class AdminPages {
 					<?php submit_button( 'Tambah Child Site (Pre-register)' ); ?>
 				</form>
 
-				<h2>Daftar Child Sites</h2>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th>ID</th>
-							<th>Nama Site</th>
-							<th>Domain</th>
-							<th>Security Key</th>
-							<th>Status</th>
-							<th>Last Seen</th>
-							<th>Action</th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
+					<h2>Daftar Child Sites</h2>
+					<style>
+					.rawatwp-sites-table th,
+					.rawatwp-sites-table td {
+						vertical-align: middle;
+					}
+					.rawatwp-sites-table .rawatwp-col-id {
+						width: 60px;
+					}
+					.rawatwp-sites-table .rawatwp-col-site {
+						width: 180px;
+					}
+					.rawatwp-sites-table .rawatwp-col-status {
+						width: 110px;
+					}
+					.rawatwp-sites-table .rawatwp-col-last-seen {
+						width: 150px;
+					}
+					.rawatwp-sites-table .rawatwp-col-action {
+						width: 170px;
+						white-space: nowrap;
+					}
+					.rawatwp-sites-table .rawatwp-domain {
+						word-break: break-word;
+					}
+					.rawatwp-sites-table .rawatwp-key-wrap {
+						display: flex;
+						align-items: center;
+						gap: 8px;
+						min-width: 0;
+					}
+					.rawatwp-sites-table .rawatwp-key-wrap code {
+						display: inline-block;
+						max-width: 100%;
+						overflow: hidden;
+						text-overflow: ellipsis;
+						white-space: nowrap;
+					}
+					.rawatwp-sites-table .rawatwp-action-form {
+						margin: 0;
+					}
+					</style>
+					<table class="widefat striped rawatwp-sites-table">
+						<thead>
 							<tr>
-								<td><?php echo esc_html( (string) $site['id'] ); ?></td>
-								<td><?php echo esc_html( $site['site_name'] ); ?></td>
-								<td><?php echo esc_html( $site['site_url'] ); ?></td>
-								<td>
-									<code><?php echo esc_html( $site['security_key'] ); ?></code>
-									<button
-										type="button"
-										class="button rawatwp-copy-key"
-										data-copy-text="<?php echo esc_attr( $site['security_key'] ); ?>"
-										style="margin-left:8px;"
-									>
-										Copy
-									</button>
-								</td>
-								<td><?php echo esc_html( $site['connection_status'] ); ?></td>
-								<td><?php echo esc_html( $this->format_datetime_for_display( isset( $site['last_seen'] ) ? $site['last_seen'] : '' ) ); ?></td>
-								<td>
-									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-										<?php wp_nonce_field( 'rawatwp_regen_key' ); ?>
-										<input type="hidden" name="action" value="rawatwp_regen_key" />
-										<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
+								<th class="rawatwp-col-id">ID</th>
+								<th class="rawatwp-col-site">Nama Site</th>
+								<th>Domain</th>
+								<th>Security Key</th>
+								<th class="rawatwp-col-status">Status</th>
+								<th class="rawatwp-col-last-seen">Last Seen</th>
+								<th class="rawatwp-col-action">Action</th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
+								<tr>
+									<td class="rawatwp-col-id"><?php echo esc_html( (string) $site['id'] ); ?></td>
+									<td class="rawatwp-col-site"><?php echo esc_html( $site['site_name'] ); ?></td>
+									<td class="rawatwp-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
+									<td>
+										<div class="rawatwp-key-wrap">
+											<code title="<?php echo esc_attr( $site['security_key'] ); ?>"><?php echo esc_html( $site['security_key'] ); ?></code>
+											<button
+												type="button"
+												class="button rawatwp-copy-key"
+												data-copy-text="<?php echo esc_attr( $site['security_key'] ); ?>"
+											>
+												Copy
+											</button>
+										</div>
+									</td>
+									<td class="rawatwp-col-status"><?php echo esc_html( $site['connection_status'] ); ?></td>
+									<td class="rawatwp-col-last-seen"><?php echo esc_html( $this->format_datetime_for_display( isset( $site['last_seen'] ) ? $site['last_seen'] : '' ) ); ?></td>
+									<td class="rawatwp-col-action">
+										<form class="rawatwp-action-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+											<?php wp_nonce_field( 'rawatwp_regen_key' ); ?>
+											<input type="hidden" name="action" value="rawatwp_regen_key" />
+											<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
 										<button class="button" type="submit">Regenerate Key</button>
 									</form>
 								</td>
