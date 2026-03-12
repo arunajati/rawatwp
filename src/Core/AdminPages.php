@@ -561,18 +561,16 @@ class AdminPages {
 					<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
 					<input type="hidden" name="action" value="rawatwp_upload_package" />
 					<table class="form-table" role="presentation">
-						<tr>
-							<th scope="row">File ZIP</th>
-							<td>
-								<input type="file" name="package_zip[]" accept=".zip" multiple required />
-								<p class="description">
-									Gunakan ZIP yang bisa di-install manual lewat WordPress (plugin/theme/core). RawatWP akan validasi otomatis. Folder package default: <code>/public_html/updates</code>.
-								</p>
-								<p id="rawatwp-upload-progress-wrap" style="display:none;margin-top:8px;">
-									Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
-								</p>
-							</td>
-						</tr>
+							<tr>
+								<th scope="row">File ZIP</th>
+								<td>
+									<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
+									<p id="rawatwp-upload-file-count" class="description"></p>
+									<p id="rawatwp-upload-progress-wrap" style="display:none;margin-top:8px;">
+										Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
+									</p>
+								</td>
+							</tr>
 					</table>
 					<?php submit_button( 'Upload Package ZIP', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
 				</form>
@@ -665,21 +663,29 @@ class AdminPages {
 						return;
 					}
 
-					var progressWrap = document.getElementById('rawatwp-upload-progress-wrap');
-					var progressValue = document.getElementById('rawatwp-upload-progress-value');
-					var submitButton = document.getElementById('rawatwp-upload-submit');
-					var uploadUrl = uploadForm.getAttribute('action') || '';
+						var progressWrap = document.getElementById('rawatwp-upload-progress-wrap');
+						var progressValue = document.getElementById('rawatwp-upload-progress-value');
+						var fileCountInfo = document.getElementById('rawatwp-upload-file-count');
+						var submitButton = document.getElementById('rawatwp-upload-submit');
+						var uploadUrl = uploadForm.getAttribute('action') || '';
+						var fileInput = document.getElementById('rawatwp-package-zip-input');
 
-					uploadForm.addEventListener('submit', function(event) {
-						if ('1' === uploadForm.getAttribute('data-uploading')) {
-							event.preventDefault();
-							return;
+						if (fileInput && fileCountInfo) {
+							fileInput.addEventListener('change', function() {
+								var count = fileInput.files ? fileInput.files.length : 0;
+								fileCountInfo.textContent = count > 0 ? (count + ' file dipilih') : '';
+							});
 						}
 
-						var fileInput = uploadForm.querySelector('input[name="package_zip[]"]');
-						if (!fileInput || !fileInput.files || !fileInput.files.length) {
-							return;
-						}
+						uploadForm.addEventListener('submit', function(event) {
+							if ('1' === uploadForm.getAttribute('data-uploading')) {
+								event.preventDefault();
+								return;
+							}
+
+							if (!fileInput || !fileInput.files || !fileInput.files.length) {
+								return;
+							}
 
 						event.preventDefault();
 						uploadForm.setAttribute('data-uploading', '1');
@@ -703,10 +709,13 @@ class AdminPages {
 							progressValue.textContent = percent + '%';
 						});
 
-						xhr.onload = function() {
-							var redirectTo = xhr.responseURL ? xhr.responseURL : '';
-							if (redirectTo) {
-								window.location.href = redirectTo;
+							xhr.onload = function() {
+								if (progressValue) {
+									progressValue.textContent = '100%';
+								}
+								var redirectTo = xhr.responseURL ? xhr.responseURL : '';
+								if (redirectTo) {
+									window.location.href = redirectTo;
 								return;
 							}
 							window.location.reload();
