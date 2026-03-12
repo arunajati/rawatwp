@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Build artifacts
+*.zip
+
+# Editor/IDE
+.idea/
+.vscode/
+
+# Logs/temp
+*.log
+tmp/
+temp/
