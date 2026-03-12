@@ -208,10 +208,7 @@ class AdminPages {
 					<tr>
 						<th scope="row">GitHub Self-Update RawatWP</th>
 						<td>
-							<label style="display:block;margin-bottom:8px;">
-								<input type="checkbox" name="github_enabled" value="1" <?php checked( '1' === (string) $github_settings['enabled'] ); ?> />
-								Aktifkan update RawatWP dari sumber resmi arunajr.com
-							</label>
+							<p><strong>Status:</strong> Aktif otomatis (tidak bisa dimatikan).</p>
 							<p class="description">Source update sudah tertanam dalam plugin. User tidak perlu isi owner/repo/token.</p>
 							<p class="description">Release wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
 							<?php if ( '' !== $github_last_error ) : ?>
@@ -223,13 +220,11 @@ class AdminPages {
 				<?php submit_button( 'Simpan Pengaturan' ); ?>
 			</form>
 
-			<?php if ( '1' === (string) $github_settings['enabled'] ) : ?>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_check_github_update_now' ); ?>
-					<input type="hidden" name="action" value="rawatwp_check_github_update_now" />
-					<?php submit_button( 'Check GitHub Update Now', 'secondary', 'submit', false ); ?>
-				</form>
-			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'rawatwp_check_github_update_now' ); ?>
+				<input type="hidden" name="action" value="rawatwp_check_github_update_now" />
+				<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
+			</form>
 
 			<hr />
 			<h2>Workflow</h2>
@@ -983,7 +978,6 @@ class AdminPages {
 
 		$this->github_updater->save_settings(
 			array(
-				'enabled' => ! empty( $_POST['github_enabled'] ) ? '1' : '0',
 			)
 		);
 

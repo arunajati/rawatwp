@@ -78,7 +78,7 @@ class GitHubUpdater {
 		$token = '' !== $default_token ? $default_token : (string) $settings['token'];
 
 		return array(
-			'enabled' => '1' === (string) $settings['enabled'] ? '1' : '0',
+			'enabled' => '1',
 			'owner'   => sanitize_text_field( $owner ),
 			'repo'    => sanitize_text_field( $repo ),
 			'token'   => sanitize_text_field( $token ),
@@ -95,7 +95,7 @@ class GitHubUpdater {
 		$current = $this->get_settings();
 
 		$sanitized = array(
-			'enabled' => ! empty( $settings['enabled'] ) ? '1' : '0',
+			'enabled' => '1',
 			'owner'   => sanitize_text_field( (string) $current['owner'] ),
 			'repo'    => sanitize_text_field( (string) $current['repo'] ),
 			'token'   => sanitize_text_field( (string) $current['token'] ),
@@ -406,7 +406,7 @@ class GitHubUpdater {
 			'body'        => isset( $body['body'] ) ? (string) $body['body'] : '',
 		);
 
-		set_transient( $cache_key, $release, HOUR_IN_SECONDS );
+		set_transient( $cache_key, $release, DAY_IN_SECONDS );
 
 		return $release;
 	}

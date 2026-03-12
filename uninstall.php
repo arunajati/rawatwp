@@ -42,6 +42,8 @@ foreach ( $options as $option_name ) {
 	delete_option( $option_name );
 }
 
+wp_clear_scheduled_hook( 'rawatwp_daily_github_update_check' );
+
 $transient_like_patterns = array(
 	'_transient_rawatwp_%',
 	'_transient_timeout_rawatwp_%',

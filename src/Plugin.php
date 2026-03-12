@@ -98,6 +98,17 @@ class Plugin {
 		add_action( 'rest_api_init', array( $this->api_manager, 'register_routes' ) );
 		add_action( 'admin_menu', array( $this->admin_pages, 'register_menus' ) );
 		add_action( 'admin_init', array( $this->admin_pages, 'register_admin_actions' ) );
+
+		add_action(
+			'rawatwp_daily_github_update_check',
+			static function() use ( $github_updater ) {
+				$github_updater->force_check_now();
+			}
+		);
+		if ( ! wp_next_scheduled( 'rawatwp_daily_github_update_check' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'rawatwp_daily_github_update_check' );
+		}
+
 		$logger->maybe_run_maintenance( 30, 10000, 3600 );
 
 		$this->initialized = true;
