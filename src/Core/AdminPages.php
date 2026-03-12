@@ -157,7 +157,7 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_bulk_delete_packages', array( $this, 'handle_bulk_delete_packages' ) );
 		add_action( 'admin_post_rawatwp_push_update', array( $this, 'handle_push_update' ) );
 		add_action( 'admin_post_rawatwp_clear_logs', array( $this, 'handle_clear_logs' ) );
-		add_action( 'admin_post_rawatwp_check_github_update_now', array( $this, 'handle_check_github_update_now' ) );
+		add_action( 'admin_post_rawatwp_check_update_now', array( $this, 'handle_check_update_now' ) );
 		add_action( 'admin_post_rawatwp_queue_run_now', array( $this, 'handle_queue_run_now' ) );
 		add_action( 'admin_post_rawatwp_queue_pause_toggle', array( $this, 'handle_queue_pause_toggle' ) );
 		add_action( 'admin_post_rawatwp_regenerate_runner_token', array( $this, 'handle_regenerate_runner_token' ) );
@@ -175,7 +175,6 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		$delete_all_on_uninstall = '1' === (string) get_option( 'rawatwp_delete_all_on_uninstall', '0' );
-		$github_settings         = $this->github_updater->get_settings();
 		$github_last_error       = $this->github_updater->get_last_error();
 		?>
 		<div class="wrap">
@@ -205,26 +204,26 @@ class AdminPages {
 							</label>
 						</td>
 					</tr>
-					<tr>
-						<th scope="row">GitHub Self-Update RawatWP</th>
-						<td>
-							<p><strong>Status:</strong> Aktif otomatis (tidak bisa dimatikan).</p>
-							<p class="description">Source update sudah tertanam dalam plugin. User tidak perlu isi owner/repo/token.</p>
-							<p class="description">Release wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
-							<?php if ( '' !== $github_last_error ) : ?>
-								<p><strong>Status GitHub terakhir:</strong> <?php echo esc_html( $github_last_error ); ?></p>
-							<?php endif; ?>
-						</td>
-					</tr>
+						<tr>
+							<th scope="row">Update RawatWP Otomatis</th>
+							<td>
+								<p><strong>Status:</strong> Aktif otomatis (tidak bisa dimatikan).</p>
+								<p class="description">Sumber update resmi sudah tertanam dalam plugin. User tidak perlu mengatur kredensial tambahan.</p>
+								<p class="description">Release wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
+								<?php if ( '' !== $github_last_error ) : ?>
+									<p><strong>Status sumber update terakhir:</strong> <?php echo esc_html( $github_last_error ); ?></p>
+								<?php endif; ?>
+							</td>
+						</tr>
 				</table>
 				<?php submit_button( 'Simpan Pengaturan' ); ?>
 			</form>
 
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'rawatwp_check_github_update_now' ); ?>
-				<input type="hidden" name="action" value="rawatwp_check_github_update_now" />
-				<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
-			</form>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<?php wp_nonce_field( 'rawatwp_check_update_now' ); ?>
+					<input type="hidden" name="action" value="rawatwp_check_update_now" />
+					<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
+				</form>
 
 			<hr />
 			<h2>Workflow</h2>
@@ -1465,19 +1464,19 @@ class AdminPages {
 	}
 
 	/**
-	 * Handle manual check now for GitHub self-update metadata.
+	 * Handle manual check now for self-update metadata.
 	 *
 	 * @return void
 	 */
-	public function handle_check_github_update_now() {
-		$this->assert_admin_post( 'rawatwp_check_github_update_now' );
+	public function handle_check_update_now() {
+		$this->assert_admin_post( 'rawatwp_check_update_now' );
 
 		$result = $this->github_updater->force_check_now();
 		if ( is_wp_error( $result ) ) {
 			$this->redirect_with_notice( 'rawatwp-general', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-general', 'Cek update GitHub selesai. Lihat menu Plugins untuk update RawatWP jika tersedia.', '' );
+		$this->redirect_with_notice( 'rawatwp-general', 'Cek update selesai. Lihat menu Plugins untuk update RawatWP jika tersedia.', '' );
 	}
 
 	/**
