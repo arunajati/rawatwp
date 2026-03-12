@@ -1522,10 +1522,13 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-general', '', $result->get_error_message() );
 		}
 
+		$latest_version = is_array( $result ) && isset( $result['version'] ) ? sanitize_text_field( (string) $result['version'] ) : '-';
+		$notice         = 'Cek update RawatWP selesai, versi terbaru saat ini: ' . $latest_version;
+
 		if ( '' !== $redirect_url ) {
-			$this->redirect_to_url_with_notice( $redirect_url, 'Cek update selesai. Jika ada versi baru, silakan update dari halaman Plugins.', '' );
+			$this->redirect_to_url_with_notice( $redirect_url, $notice, '' );
 		}
-		$this->redirect_with_notice( 'rawatwp-general', 'Cek update selesai. Lihat menu Plugins untuk update RawatWP jika tersedia.', '' );
+		$this->redirect_with_notice( 'rawatwp-general', $notice, '' );
 	}
 
 	/**

@@ -311,7 +311,7 @@ class GitHubUpdater {
 	/**
 	 * Force update metadata refresh.
 	 *
-	 * @return true|\WP_Error
+	 * @return array|\WP_Error
 	 */
 	public function force_check_now() {
 		$this->flush_release_cache();
@@ -328,7 +328,7 @@ class GitHubUpdater {
 		}
 		wp_update_plugins();
 
-		return true;
+		return $release;
 	}
 
 	/**
