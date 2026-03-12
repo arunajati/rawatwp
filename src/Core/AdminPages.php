@@ -175,7 +175,6 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		$delete_all_on_uninstall = '1' === (string) get_option( 'rawatwp_delete_all_on_uninstall', '0' );
-		$github_last_error       = $this->github_updater->get_last_error();
 		?>
 		<div class="wrap">
 			<h1>RawatWP - General</h1>
@@ -187,65 +186,34 @@ class AdminPages {
 					<tr>
 						<th scope="row"><label for="rawatwp_mode">Mode Aktif</label></th>
 						<td>
-							<select id="rawatwp_mode" name="rawatwp_mode">
-								<option value="">Pilih Mode</option>
-								<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
-								<option value="child" <?php selected( $mode, 'child' ); ?>>Child</option>
-							</select>
-							<p class="description">Hanya satu mode boleh aktif dalam satu instalasi WordPress.</p>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row">Hapus Data Saat Uninstall</th>
-						<td>
-							<label>
-								<input type="checkbox" name="delete_all_on_uninstall" value="1" <?php checked( $delete_all_on_uninstall ); ?> />
-								Saat plugin dihapus dari menu Plugins, hapus juga seluruh data RawatWP (database, logs, settings, folder files, ZIP updates).
-							</label>
-						</td>
-					</tr>
-						<tr>
-							<th scope="row">Update RawatWP Otomatis</th>
-							<td>
-								<p><strong>Status:</strong> Aktif otomatis (tidak bisa dimatikan).</p>
-								<p class="description">Sumber update resmi sudah tertanam dalam plugin. User tidak perlu mengatur kredensial tambahan.</p>
-								<p class="description">Release wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
-								<?php if ( '' !== $github_last_error ) : ?>
-									<p><strong>Status sumber update terakhir:</strong> <?php echo esc_html( $github_last_error ); ?></p>
-								<?php endif; ?>
+								<select id="rawatwp_mode" name="rawatwp_mode">
+									<option value="">Pilih Mode</option>
+									<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
+									<option value="child" <?php selected( $mode, 'child' ); ?>>Child</option>
+								</select>
+								<p class="description">Pilih satu mode:<br />- Master (untuk penyedia update)<br />- Child (untuk penerima update)</p>
 							</td>
 						</tr>
-				</table>
-				<?php submit_button( 'Simpan Pengaturan' ); ?>
-			</form>
+						<tr>
+							<th scope="row">Hapus Data Saat Uninstall</th>
+							<td>
+								<label>
+									<input type="checkbox" name="delete_all_on_uninstall" value="1" <?php checked( $delete_all_on_uninstall ); ?> />
+									Hapus Bersih
+								</label>
+							</td>
+						</tr>
+					</table>
+					<?php submit_button( 'Simpan Pengaturan' ); ?>
+				</form>
 
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'rawatwp_check_update_now' ); ?>
 					<input type="hidden" name="action" value="rawatwp_check_update_now" />
 					<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
 				</form>
-
-			<hr />
-			<h2>Workflow</h2>
-			<?php if ( 'master' === $mode ) : ?>
-				<ol>
-					<li>Tambah Child Site di menu <strong>Sites</strong> (pre-register).</li>
-					<li>Upload/scan package ZIP di menu <strong>Packages</strong>.</li>
-					<li>Kirim update dari menu <strong>Updates</strong>. Progress diproses lewat queue.</li>
-					<li>Pantau hasil di <strong>Updates</strong> dan detail kejadian di <strong>Logs</strong>.</li>
-				</ol>
-			<?php elseif ( 'child' === $mode ) : ?>
-				<ol>
-					<li>Set Master URL + Security Key di menu <strong>Connection</strong> lalu klik <strong>Save &amp; Connect</strong>.</li>
-					<li>Tambahkan item yang dipantau di menu <strong>Monitored Items</strong>.</li>
-					<li>Tandai item butuh update, lalu kirim report ke Master.</li>
-					<li>Tunggu perintah push dari Master, hasil otomatis tercatat di <strong>Logs</strong>.</li>
-				</ol>
-			<?php else : ?>
-				<p>Pilih mode terlebih dahulu agar workflow tampil sesuai peran site ini.</p>
-			<?php endif; ?>
-		</div>
-		<?php
+			</div>
+			<?php
 	}
 
 	/**
