@@ -95,9 +95,10 @@ class Plugin {
 		$this->api_manager  = new ApiManager( $mode_manager, $master_manager, $child_manager, $queue_manager, $security );
 		$this->admin_pages  = new AdminPages( $mode_manager, $master_manager, $child_manager, $monitored_items, $package_manager, $queue_manager, $logger, $security, $github_updater );
 
-		add_action( 'rest_api_init', array( $this->api_manager, 'register_routes' ) );
-		add_action( 'admin_menu', array( $this->admin_pages, 'register_menus' ) );
-		add_action( 'admin_init', array( $this->admin_pages, 'register_admin_actions' ) );
+			add_action( 'rest_api_init', array( $this->api_manager, 'register_routes' ) );
+			add_action( 'admin_menu', array( $this->admin_pages, 'register_menus' ) );
+			add_action( 'admin_init', array( $this->admin_pages, 'register_admin_actions' ) );
+			add_filter( 'plugin_row_meta', array( $this->admin_pages, 'add_plugin_row_meta_check_update' ), 10, 4 );
 
 		add_action(
 			'rawatwp_daily_github_update_check',

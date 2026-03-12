@@ -167,6 +167,41 @@ class AdminPages {
 	}
 
 	/**
+	 * Add "Check Update" link on RawatWP plugin row meta in Plugins page.
+	 *
+	 * @param array  $plugin_meta Existing plugin meta links.
+	 * @param string $plugin_file Plugin file relative path.
+	 * @param array  $plugin_data Plugin header data.
+	 * @param string $status      Plugin status.
+	 * @return array
+	 */
+	public function add_plugin_row_meta_check_update( $plugin_meta, $plugin_file, $plugin_data, $status ) {
+		unset( $plugin_data, $status );
+
+		if ( plugin_basename( RAWATWP_FILE ) !== $plugin_file ) {
+			return $plugin_meta;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return $plugin_meta;
+		}
+
+		$check_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'action' => 'rawatwp_check_update_now',
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'rawatwp_check_update_now'
+		);
+
+		$plugin_meta[] = '<a href="' . esc_url( $check_url ) . '">Check Update</a>';
+
+		return $plugin_meta;
+	}
+
+	/**
 	 * Render general page.
 	 *
 	 * @return void
