@@ -417,70 +417,66 @@ class AdminPages {
 
 					<h2>Daftar Child Sites</h2>
 					<style>
-					.rawatwp-sites-table th,
-					.rawatwp-sites-table td {
-						vertical-align: middle;
-					}
-					.rawatwp-sites-table .rawatwp-col-id {
-						width: 60px;
-					}
-					.rawatwp-sites-table .rawatwp-col-site {
-						width: 180px;
-					}
-					.rawatwp-sites-table .rawatwp-col-status {
-						width: 110px;
-					}
-					.rawatwp-sites-table .rawatwp-col-last-seen {
-						width: 150px;
-					}
-					.rawatwp-sites-table .rawatwp-col-action {
-						width: 170px;
-						white-space: nowrap;
-					}
-					.rawatwp-sites-table .rawatwp-domain {
-						word-break: break-word;
-					}
-					.rawatwp-sites-table .rawatwp-key-wrap {
-						display: flex;
-						align-items: center;
-						gap: 8px;
-						min-width: 0;
-					}
-					.rawatwp-sites-table .rawatwp-key-wrap code {
-						display: inline-block;
-						max-width: 100%;
-						overflow: hidden;
-						text-overflow: ellipsis;
-						white-space: nowrap;
-					}
-					.rawatwp-sites-table .rawatwp-action-form {
-						margin: 0;
-					}
-					</style>
+						.rawatwp-sites-table th,
+						.rawatwp-sites-table td {
+							vertical-align: middle;
+						}
+						.rawatwp-sites-table .rawatwp-col-id {
+							width: 42px;
+						}
+						.rawatwp-sites-table .rawatwp-col-site {
+							width: 170px;
+						}
+						.rawatwp-sites-table .rawatwp-col-domain {
+							width: 38%;
+						}
+						.rawatwp-sites-table .rawatwp-col-key {
+							width: 110px;
+						}
+						.rawatwp-sites-table .rawatwp-col-status {
+							width: 95px;
+						}
+						.rawatwp-sites-table .rawatwp-col-last-seen {
+							width: 150px;
+						}
+						.rawatwp-sites-table .rawatwp-col-action {
+							width: 155px;
+							white-space: nowrap;
+						}
+						.rawatwp-sites-table .rawatwp-domain {
+							word-break: break-word;
+						}
+						.rawatwp-sites-table .rawatwp-key-wrap {
+							display: inline-flex;
+							align-items: center;
+						}
+						.rawatwp-sites-table .rawatwp-action-form {
+							margin: 0;
+						}
+						</style>
 					<table class="widefat striped rawatwp-sites-table">
 						<thead>
-							<tr>
-								<th class="rawatwp-col-id">ID</th>
-								<th class="rawatwp-col-site">Nama Site</th>
-								<th>Domain</th>
-								<th>Security Key</th>
-								<th class="rawatwp-col-status">Status</th>
-								<th class="rawatwp-col-last-seen">Last Seen</th>
-								<th class="rawatwp-col-action">Action</th>
-							</tr>
-						</thead>
+								<tr>
+									<th class="rawatwp-col-id">ID</th>
+									<th class="rawatwp-col-site">Nama Site</th>
+									<th class="rawatwp-col-domain">Domain</th>
+									<th class="rawatwp-col-key">Security Key</th>
+									<th class="rawatwp-col-status">Status</th>
+									<th class="rawatwp-col-last-seen">Last Seen</th>
+									<th class="rawatwp-col-action">Action</th>
+								</tr>
+							</thead>
 						<tbody>
 							<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
 								<tr>
 									<td class="rawatwp-col-id"><?php echo esc_html( (string) $site['id'] ); ?></td>
 									<td class="rawatwp-col-site"><?php echo esc_html( $site['site_name'] ); ?></td>
-									<td class="rawatwp-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
-									<td>
-										<div class="rawatwp-key-wrap">
-											<code title="<?php echo esc_attr( $site['security_key'] ); ?>"><?php echo esc_html( $site['security_key'] ); ?></code>
-											<button
-												type="button"
-												class="button rawatwp-copy-key"
+										<td class="rawatwp-domain rawatwp-col-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
+										<td class="rawatwp-col-key">
+											<div class="rawatwp-key-wrap">
+												<button
+													type="button"
+													class="button rawatwp-copy-key"
 												data-copy-text="<?php echo esc_attr( $site['security_key'] ); ?>"
 											>
 												Copy
