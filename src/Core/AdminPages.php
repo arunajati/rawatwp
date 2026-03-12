@@ -574,7 +574,7 @@ class AdminPages {
 								<td>
 									<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 									<p id="rawatwp-upload-file-count" class="description"></p>
-									<p id="rawatwp-upload-progress-wrap" style="display:none;margin-top:8px;">
+									<p id="rawatwp-upload-progress-wrap" class="rawatwp-upload-progress">
 										Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
 									</p>
 								</td>
@@ -605,7 +605,7 @@ class AdminPages {
 					<table class="widefat striped rawatwp-package-table">
 					<thead>
 						<tr>
-							<th style="width:40px;">
+							<th class="rawatwp-col-check">
 								<input type="checkbox" id="rawatwp-check-all-packages" />
 							</th>
 							<th>ID</th>
@@ -866,7 +866,7 @@ class AdminPages {
 							<tr>
 								<th scope="row">Pilih Child Site</th>
 								<td>
-									<label style="display:block;margin-bottom:8px;">
+									<label class="rawatwp-select-all-sites">
 										<input type="checkbox" id="rawatwp-select-all-sites" />
 										Pilih semua child site
 									</label>
@@ -936,7 +936,7 @@ class AdminPages {
 												<div class="description"><?php echo esc_html( $detail_text ); ?></div>
 											<?php endif; ?>
 										</td>
-										<td style="min-width:120px;">
+											<td class="rawatwp-progress-cell">
 											<div class="rawatwp-progress-wrap">
 												<div class="rawatwp-progress-bar" style="width:<?php echo esc_attr( (string) max( 0, min( 100, (int) $row['progress'] ) ) ); ?>%;"></div>
 											</div>
@@ -951,14 +951,14 @@ class AdminPages {
 
 						<details class="rawatwp-advanced-updates">
 							<summary>Pengaturan Lanjutan</summary>
-							<p style="margin-top:10px;"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
+							<p class="rawatwp-mt-2"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
 							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<?php wp_nonce_field( 'rawatwp_regenerate_runner_token' ); ?>
 							<input type="hidden" name="action" value="rawatwp_regenerate_runner_token" />
 							<?php submit_button( 'Regenerate Runner Token', 'secondary', 'submit', false ); ?>
 							</form>
 							<p class="description">URL runner untuk system cron (1 menit sekali):</p>
-							<p><code style="word-break:break-all;"><?php echo esc_html( $runner_url ); ?></code></p>
+							<p><code class="rawatwp-break-word"><?php echo esc_html( $runner_url ); ?></code></p>
 						</details>
 					</div>
 					<script>

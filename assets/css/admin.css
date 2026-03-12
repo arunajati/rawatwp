@@ -1,9 +1,13 @@
 .rawatwp-admin {
 	max-width: 1280px;
+	--rawatwp-space-1: 8px;
+	--rawatwp-space-2: 12px;
+	--rawatwp-space-3: 16px;
+	--rawatwp-space-4: 20px;
 }
 
 .rawatwp-admin .rawatwp-page-subtitle {
-	margin: -4px 0 14px;
+	margin: -4px 0 var(--rawatwp-space-3);
 	color: #646970;
 }
 
@@ -11,23 +15,27 @@
 	background: #fff;
 	border: 1px solid #dcdcde;
 	border-radius: 10px;
-	padding: 16px 18px;
-	margin-bottom: 14px;
+	padding: var(--rawatwp-space-3);
+	margin-bottom: var(--rawatwp-space-3);
 	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
 
 .rawatwp-admin .rawatwp-card > h2 {
 	margin-top: 0;
-	margin-bottom: 12px;
+	margin-bottom: var(--rawatwp-space-2);
 	font-size: 20px;
+}
+
+.rawatwp-admin .rawatwp-card > :last-child {
+	margin-bottom: 0;
 }
 
 .rawatwp-admin .rawatwp-toolbar {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px;
-	margin: 0 0 12px;
+	gap: var(--rawatwp-space-1);
+	margin: 0 0 var(--rawatwp-space-2);
 }
 
 .rawatwp-admin .rawatwp-toolbar form {
@@ -36,6 +44,16 @@
 
 .rawatwp-admin .rawatwp-inline-form {
 	display: inline-block;
+	margin: 0;
+}
+
+.rawatwp-admin .submit {
+	margin: var(--rawatwp-space-2) 0 0;
+	padding: 0;
+}
+
+.rawatwp-admin .rawatwp-inline-form .submit,
+.rawatwp-admin .rawatwp-toolbar .submit {
 	margin: 0;
 }
 
@@ -53,6 +71,10 @@
 
 .rawatwp-admin .form-table th {
 	width: 220px;
+}
+
+.rawatwp-admin .rawatwp-card .form-table {
+	margin: 0;
 }
 
 .rawatwp-admin .description {
@@ -109,8 +131,8 @@
 .rawatwp-admin .rawatwp-package-bulk-actions {
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	margin: 0 0 14px;
+	gap: var(--rawatwp-space-1);
+	margin: 0 0 var(--rawatwp-space-2);
 }
 
 .rawatwp-admin .rawatwp-package-bulk-actions select {
@@ -124,15 +146,15 @@
 .rawatwp-admin .rawatwp-update-kpis {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-	gap: 10px;
-	margin: 0 0 16px;
+	gap: var(--rawatwp-space-2);
+	margin: 0 0 var(--rawatwp-space-3);
 }
 
 .rawatwp-admin .rawatwp-update-kpi {
 	background: #fff;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
-	padding: 10px 12px;
+	padding: var(--rawatwp-space-2);
 }
 
 .rawatwp-admin .rawatwp-update-kpi .label {
@@ -153,8 +175,8 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px;
-	margin: 0 0 14px;
+	gap: var(--rawatwp-space-1);
+	margin: 0 0 var(--rawatwp-space-2);
 }
 
 .rawatwp-admin .rawatwp-updates-site-list {
@@ -162,7 +184,7 @@
 	overflow: auto;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
-	padding: 10px;
+	padding: var(--rawatwp-space-2);
 	background: #fff;
 }
 
@@ -215,11 +237,37 @@
 }
 
 .rawatwp-admin .rawatwp-advanced-updates {
-	margin-top: 12px;
-	padding: 10px 12px;
+	margin-top: var(--rawatwp-space-2);
+	padding: var(--rawatwp-space-3);
 	background: #fff;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
+}
+
+.rawatwp-admin .rawatwp-upload-progress {
+	display: none;
+	margin-top: var(--rawatwp-space-1);
+}
+
+.rawatwp-admin .rawatwp-col-check {
+	width: 40px;
+}
+
+.rawatwp-admin .rawatwp-select-all-sites {
+	display: block;
+	margin-bottom: var(--rawatwp-space-1);
+}
+
+.rawatwp-admin .rawatwp-progress-cell {
+	min-width: 120px;
+}
+
+.rawatwp-admin .rawatwp-mt-2 {
+	margin-top: var(--rawatwp-space-2);
+}
+
+.rawatwp-admin .rawatwp-break-word {
+	word-break: break-all;
 }
 
 @media (max-width: 960px) {
