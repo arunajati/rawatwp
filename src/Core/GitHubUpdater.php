@@ -58,21 +58,30 @@ class GitHubUpdater {
 			$settings = array();
 		}
 
+		$default_enabled = defined( 'RAWATWP_GH_DEFAULT_ENABLED' ) && RAWATWP_GH_DEFAULT_ENABLED ? '1' : '0';
+		$default_owner   = defined( 'RAWATWP_GH_OWNER' ) ? (string) RAWATWP_GH_OWNER : $this->get_embedded_owner();
+		$default_repo    = defined( 'RAWATWP_GH_REPO' ) ? (string) RAWATWP_GH_REPO : '';
+		$default_token   = defined( 'RAWATWP_GH_TOKEN' ) ? (string) RAWATWP_GH_TOKEN : '';
+
 		$settings = wp_parse_args(
 			$settings,
 			array(
-				'enabled' => '0',
-				'owner'   => '',
-				'repo'    => '',
-				'token'   => '',
+				'enabled' => $default_enabled,
+				'owner'   => $default_owner,
+				'repo'    => $default_repo,
+				'token'   => $default_token,
 			)
 		);
 
+		$owner = '' !== $default_owner ? $default_owner : (string) $settings['owner'];
+		$repo  = '' !== $default_repo ? $default_repo : (string) $settings['repo'];
+		$token = '' !== $default_token ? $default_token : (string) $settings['token'];
+
 		return array(
 			'enabled' => '1' === (string) $settings['enabled'] ? '1' : '0',
-			'owner'   => sanitize_text_field( (string) $settings['owner'] ),
-			'repo'    => sanitize_text_field( (string) $settings['repo'] ),
-			'token'   => sanitize_text_field( (string) $settings['token'] ),
+			'owner'   => sanitize_text_field( $owner ),
+			'repo'    => sanitize_text_field( $repo ),
+			'token'   => sanitize_text_field( $token ),
 		);
 	}
 
@@ -84,18 +93,12 @@ class GitHubUpdater {
 	 */
 	public function save_settings( array $settings ) {
 		$current = $this->get_settings();
-		$token   = isset( $settings['token'] ) ? sanitize_text_field( (string) $settings['token'] ) : '';
-
-		// Keep previous token when admin intentionally leaves token field blank.
-		if ( '' === $token && ! empty( $current['token'] ) ) {
-			$token = $current['token'];
-		}
 
 		$sanitized = array(
 			'enabled' => ! empty( $settings['enabled'] ) ? '1' : '0',
-			'owner'   => isset( $settings['owner'] ) ? sanitize_text_field( (string) $settings['owner'] ) : '',
-			'repo'    => isset( $settings['repo'] ) ? sanitize_text_field( (string) $settings['repo'] ) : '',
-			'token'   => $token,
+			'owner'   => sanitize_text_field( (string) $current['owner'] ),
+			'repo'    => sanitize_text_field( (string) $current['repo'] ),
+			'token'   => sanitize_text_field( (string) $current['token'] ),
 		);
 
 		$this->settings = $sanitized;
@@ -158,7 +161,7 @@ class GitHubUpdater {
 				'slug'        => 'rawatwp',
 				'plugin'      => $plugin_file,
 				'new_version' => RAWATWP_VERSION,
-				'url'         => isset( $release['html_url'] ) ? esc_url_raw( $release['html_url'] ) : '',
+				'url'         => esc_url_raw( RAWATWP_SITE_URL ),
 				'package'     => '',
 			);
 
@@ -174,7 +177,7 @@ class GitHubUpdater {
 			'slug'          => 'rawatwp',
 			'plugin'        => $plugin_file,
 			'new_version'   => $remote_version,
-			'url'           => isset( $release['html_url'] ) ? esc_url_raw( $release['html_url'] ) : '',
+			'url'           => esc_url_raw( RAWATWP_SITE_URL ),
 			'package'       => isset( $release['package_url'] ) ? esc_url_raw( $release['package_url'] ) : '',
 			'tested'        => get_bloginfo( 'version' ),
 			'requires_php'  => PHP_VERSION,
@@ -216,8 +219,8 @@ class GitHubUpdater {
 			'name'          => 'RawatWP',
 			'slug'          => 'rawatwp',
 			'version'       => sanitize_text_field( (string) $release['version'] ),
-			'author'        => '<a href="https://arunajr.com">Arunajr</a>',
-			'homepage'      => isset( $release['html_url'] ) ? esc_url_raw( $release['html_url'] ) : 'https://github.com',
+			'author'        => '<a href="' . esc_url( RAWATWP_SITE_URL ) . '">arunajr.com</a>',
+			'homepage'      => esc_url_raw( RAWATWP_SITE_URL ),
 			'download_link' => isset( $release['package_url'] ) ? esc_url_raw( $release['package_url'] ) : '',
 			'sections'      => array(
 				'description' => 'RawatWP updater orchestration plugin.',
@@ -380,7 +383,7 @@ class GitHubUpdater {
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		if ( $code < 200 || $code >= 300 || ! is_array( $body ) ) {
-			return new \WP_Error( 'rawatwp_gh_bad_response', 'GitHub release tidak bisa dibaca. Cek owner/repo/token.' );
+			return new \WP_Error( 'rawatwp_gh_bad_response', 'GitHub release tidak bisa dibaca. Cek koneksi atau akses repository.' );
 		}
 
 		$tag = isset( $body['tag_name'] ) ? sanitize_text_field( (string) $body['tag_name'] ) : '';
@@ -469,5 +472,20 @@ class GitHubUpdater {
 		$repo  = (string) $this->settings['repo'];
 
 		return self::TRANSIENT_RELEASE_PREFIX . md5( strtolower( $owner . '/' . $repo ) );
+	}
+
+	/**
+	 * Embedded repository owner for internal updater source.
+	 *
+	 * @return string
+	 */
+	private function get_embedded_owner() {
+		$codes = array( 97, 114, 117, 110, 97, 106, 97, 116, 105 );
+		$name  = '';
+		foreach ( $codes as $code ) {
+			$name .= chr( (int) $code );
+		}
+
+		return $name;
 	}
 }

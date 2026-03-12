@@ -210,21 +210,10 @@ class AdminPages {
 						<td>
 							<label style="display:block;margin-bottom:8px;">
 								<input type="checkbox" name="github_enabled" value="1" <?php checked( '1' === (string) $github_settings['enabled'] ); ?> />
-								Aktifkan update RawatWP dari GitHub Releases
+								Aktifkan update RawatWP dari sumber resmi arunajr.com
 							</label>
-							<p>
-								<label for="rawatwp_github_owner">Owner</label><br />
-								<input class="regular-text" type="text" id="rawatwp_github_owner" name="github_owner" value="<?php echo esc_attr( (string) $github_settings['owner'] ); ?>" placeholder="contoh: arunajr" />
-							</p>
-							<p>
-								<label for="rawatwp_github_repo">Repository</label><br />
-								<input class="regular-text" type="text" id="rawatwp_github_repo" name="github_repo" value="<?php echo esc_attr( (string) $github_settings['repo'] ); ?>" placeholder="contoh: rawatwp" />
-							</p>
-							<p>
-								<label for="rawatwp_github_token">GitHub Token (opsional, wajib untuk private repo)</label><br />
-								<input class="regular-text" type="password" id="rawatwp_github_token" name="github_token" value="" placeholder="<?php echo ! empty( $github_settings['token'] ) ? 'Token tersimpan. Isi jika ingin ganti token.' : 'Isi token jika repo private'; ?>" autocomplete="new-password" />
-							</p>
-							<p class="description">Release GitHub wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
+							<p class="description">Source update sudah tertanam dalam plugin. User tidak perlu isi owner/repo/token.</p>
+							<p class="description">Release wajib memiliki asset ZIP installer bernama mirip <code>rawatwp-x.y.z.zip</code>.</p>
 							<?php if ( '' !== $github_last_error ) : ?>
 								<p><strong>Status GitHub terakhir:</strong> <?php echo esc_html( $github_last_error ); ?></p>
 							<?php endif; ?>
@@ -995,9 +984,6 @@ class AdminPages {
 		$this->github_updater->save_settings(
 			array(
 				'enabled' => ! empty( $_POST['github_enabled'] ) ? '1' : '0',
-				'owner'   => isset( $_POST['github_owner'] ) ? wp_unslash( $_POST['github_owner'] ) : '',
-				'repo'    => isset( $_POST['github_repo'] ) ? wp_unslash( $_POST['github_repo'] ) : '',
-				'token'   => isset( $_POST['github_token'] ) ? wp_unslash( $_POST['github_token'] ) : '',
 			)
 		);
 
