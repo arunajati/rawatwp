@@ -761,100 +761,184 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-		<div class="wrap">
-			<h1>RawatWP - Updates</h1>
-			<?php $this->render_notices(); ?>
-			<?php if ( 'master' !== $mode ) : ?>
-				<p>Halaman ini aktif hanya untuk mode Master.</p>
-			<?php else : ?>
-				<?php
-				$packages      = $this->package_manager->get_packages();
-				$sites         = $this->master_manager->get_sites_update_summary();
-				$queue_rows    = $this->queue_manager->get_queue_rows( 200 );
-				$queue_counts  = $this->queue_manager->get_queue_counts();
-				$queue_paused  = $this->queue_manager->is_paused();
-				$runner_token  = $this->security->get_queue_runner_token();
-				$runner_url    = add_query_arg(
-					array(
-						'token' => $runner_token,
-						'limit' => 1,
-					),
-					rest_url( 'rawatwp/v1/master/queue-run' )
-				);
-				$has_pending   = $this->has_pending_queue_items( $queue_rows );
-				$ajax_nonce    = wp_create_nonce( 'rawatwp_queue_ajax' );
-				?>
-				<h2>Site dengan Kebutuhan Update</h2>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th>Site</th>
-							<th>Status</th>
-							<th>Needs Update Items</th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $sites as $site ) : ?>
+			<div class="wrap">
+				<h1>RawatWP - Updates</h1>
+				<?php $this->render_notices(); ?>
+				<?php if ( 'master' !== $mode ) : ?>
+					<p>Halaman ini aktif hanya untuk mode Master.</p>
+				<?php else : ?>
+					<?php
+					$packages          = $this->package_manager->get_packages();
+					$site_summaries    = $this->master_manager->get_sites_update_summary();
+					$child_sites       = $this->master_manager->get_sites();
+					$queue_rows        = $this->queue_manager->get_queue_rows( 200 );
+					$queue_counts      = $this->queue_manager->get_queue_counts();
+					$queue_paused      = $this->queue_manager->is_paused();
+					$runner_token      = $this->security->get_queue_runner_token();
+					$runner_url        = add_query_arg(
+						array(
+							'token' => $runner_token,
+							'limit' => 1,
+						),
+						rest_url( 'rawatwp/v1/master/queue-run' )
+					);
+					$has_pending       = $this->has_pending_queue_items( $queue_rows );
+					$ajax_nonce        = wp_create_nonce( 'rawatwp_queue_ajax' );
+					$on_queue_count    = isset( $queue_counts['on_queue'] ) ? (int) $queue_counts['on_queue'] : 0;
+					$processing_count  = isset( $queue_counts['processing'] ) ? (int) $queue_counts['processing'] : 0;
+					$success_count     = isset( $queue_counts['success'] ) ? (int) $queue_counts['success'] : 0;
+					$failed_count      = isset( $queue_counts['failed'] ) ? (int) $queue_counts['failed'] : 0;
+					$needs_update_site = 0;
+					$needs_by_url      = array();
+					foreach ( $site_summaries as $summary ) {
+						$url         = isset( $summary['site_url'] ) ? (string) $summary['site_url'] : '';
+						$needs_count = ! empty( $summary['needs_update_items'] ) && is_array( $summary['needs_update_items'] ) ? count( $summary['needs_update_items'] ) : 0;
+						if ( $needs_count > 0 ) {
+							$needs_update_site++;
+						}
+						if ( '' !== $url ) {
+							$needs_by_url[ $url ] = $needs_count;
+						}
+					}
+					$queue_total_active = $on_queue_count + $processing_count;
+					$status_labels      = array(
+						'on_queue'   => 'Dalam Antrian',
+						'processing' => 'Sedang Diproses',
+						'success'    => 'Berhasil',
+						'failed'     => 'Gagal',
+					);
+					?>
+					<style>
+					.rawatwp-update-kpis {
+						display: grid;
+						grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+						gap: 10px;
+						margin: 0 0 16px 0;
+					}
+					.rawatwp-update-kpi {
+						background: #fff;
+						border: 1px solid #dcdcde;
+						border-radius: 6px;
+						padding: 10px 12px;
+					}
+					.rawatwp-update-kpi .label {
+						display: block;
+						font-size: 12px;
+						color: #50575e;
+						margin-bottom: 6px;
+					}
+					.rawatwp-update-kpi .value {
+						display: block;
+						font-size: 22px;
+						font-weight: 600;
+						line-height: 1.2;
+					}
+					.rawatwp-updates-controls {
+						display: flex;
+						flex-wrap: wrap;
+						align-items: center;
+						gap: 8px;
+						margin: 0 0 14px 0;
+					}
+					.rawatwp-updates-site-list {
+						max-height: 220px;
+						overflow: auto;
+						border: 1px solid #dcdcde;
+						border-radius: 6px;
+						padding: 10px;
+						background: #fff;
+					}
+					.rawatwp-updates-site-item {
+						display: block;
+						margin: 0 0 8px 0;
+					}
+					.rawatwp-updates-site-meta {
+						color: #646970;
+						font-size: 12px;
+					}
+					.rawatwp-status-badge {
+						display: inline-block;
+						padding: 2px 8px;
+						border-radius: 999px;
+						font-size: 12px;
+						font-weight: 600;
+						line-height: 1.5;
+					}
+					.rawatwp-status-on_queue,
+					.rawatwp-status-processing {
+						background: #f0f6fc;
+						color: #0a4b78;
+					}
+					.rawatwp-status-success {
+						background: #edfaef;
+						color: #146c2e;
+					}
+					.rawatwp-status-failed {
+						background: #fcf0f1;
+						color: #8a2424;
+					}
+					.rawatwp-progress-wrap {
+						background: #ececec;
+						border-radius: 4px;
+						overflow: hidden;
+						height: 10px;
+						margin-bottom: 4px;
+					}
+					.rawatwp-progress-bar {
+						background: #2271b1;
+						height: 10px;
+					}
+					.rawatwp-advanced-updates {
+						margin-top: 12px;
+						padding: 10px 12px;
+						background: #fff;
+						border: 1px solid #dcdcde;
+						border-radius: 6px;
+					}
+					</style>
+
+					<h2>Ringkasan Cepat</h2>
+					<div class="rawatwp-update-kpis">
+						<div class="rawatwp-update-kpi">
+							<span class="label">Total Child Site</span>
+							<span class="value"><?php echo esc_html( (string) count( $child_sites ) ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Site Butuh Update</span>
+							<span class="value"><?php echo esc_html( (string) $needs_update_site ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Sedang/Antri Proses</span>
+							<span class="value"><?php echo esc_html( (string) $queue_total_active ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Berhasil / Gagal</span>
+							<span class="value"><?php echo esc_html( (string) $success_count . ' / ' . (string) $failed_count ); ?></span>
+						</div>
+					</div>
+
+					<div class="rawatwp-updates-controls">
+						<form style="margin:0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
+							<input type="hidden" name="action" value="rawatwp_queue_run_now" />
+							<?php submit_button( 'Proses Queue Sekarang', 'secondary', 'submit', false ); ?>
+						</form>
+
+						<form style="margin:0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
+							<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
+							<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
+							<?php submit_button( $queue_paused ? 'Lanjutkan Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
+						</form>
+					</div>
+					<p class="description">Status queue saat ini: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
+
+					<h2>Kirim Update</h2>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
+						<input type="hidden" name="action" value="rawatwp_push_update" />
+						<table class="form-table" role="presentation">
 							<tr>
-								<td><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></td>
-								<td><?php echo esc_html( $site['connection_status'] ); ?></td>
-								<td>
-									<?php
-									if ( empty( $site['needs_update_items'] ) ) {
-										echo 'Tidak ada';
-									} else {
-										$labels = array();
-										foreach ( $site['needs_update_items'] as $item ) {
-											$labels[] = sprintf( '%s:%s', $item['type'], $item['slug'] );
-										}
-										echo esc_html( implode( ', ', $labels ) );
-									}
-									?>
-								</td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-
-				<h2>Runner Queue</h2>
-				<p><strong>Status Queue:</strong> <?php echo $queue_paused ? 'Paused' : 'Active'; ?></p>
-				<p>
-					<strong>Ringkasan:</strong>
-					On Queue <?php echo esc_html( (string) (int) $queue_counts['on_queue'] ); ?>,
-					Processing <?php echo esc_html( (string) (int) $queue_counts['processing'] ); ?>,
-					Success <?php echo esc_html( (string) (int) $queue_counts['success'] ); ?>,
-					Failed <?php echo esc_html( (string) (int) $queue_counts['failed'] ); ?>.
-				</p>
-
-				<form style="display:inline-block;margin-right:8px;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
-					<input type="hidden" name="action" value="rawatwp_queue_run_now" />
-					<?php submit_button( 'Run Queue Now', 'secondary', 'submit', false ); ?>
-				</form>
-
-				<form style="display:inline-block;margin-right:8px;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
-					<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
-					<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
-					<?php submit_button( $queue_paused ? 'Resume Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
-				</form>
-
-				<form style="display:inline-block;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_regenerate_runner_token' ); ?>
-					<input type="hidden" name="action" value="rawatwp_regenerate_runner_token" />
-					<?php submit_button( 'Regenerate Runner Token', 'secondary', 'submit', false ); ?>
-				</form>
-
-				<p style="margin-top:10px;"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan Browser Worker saat halaman ini terbuka</label></p>
-				<p class="description">System cron utama: panggil URL berikut tiap 1 menit dari cron server (tanpa WP-Cron).</p>
-				<p><code style="word-break:break-all;"><?php echo esc_html( $runner_url ); ?></code></p>
-
-				<h2>Queue Update ke Child</h2>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
-					<input type="hidden" name="action" value="rawatwp_push_update" />
-					<table class="form-table" role="presentation">
-						<tr>
 							<th scope="row">Pilih Package</th>
 							<td>
 								<select name="package_id" required>
@@ -864,77 +948,123 @@ class AdminPages {
 									<?php endforeach; ?>
 								</select>
 							</td>
-						</tr>
-						<tr>
-							<th scope="row">Pilih Child Site</th>
-							<td>
-								<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
-									<label style="display:block;margin-bottom:4px;">
-										<input type="checkbox" name="site_ids[]" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
-										<?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?>
-									</label>
-								<?php endforeach; ?>
-							</td>
-						</tr>
-					</table>
-					<?php submit_button( 'Masukkan ke Queue Update' ); ?>
-				</form>
-
-				<h2>Progress Queue</h2>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th>Queue ID</th>
-							<th>Batch</th>
-							<th>Site</th>
-							<th>Package</th>
-							<th>Status</th>
-							<th>Progress</th>
-							<th>Attempt</th>
-							<th>Reason</th>
-							<th>Message</th>
-							<th>Updated</th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php if ( empty( $queue_rows ) ) : ?>
-							<tr>
-								<td colspan="10">Belum ada queue.</td>
 							</tr>
-						<?php else : ?>
-							<?php foreach ( $queue_rows as $row ) : ?>
-								<tr>
-									<td><?php echo esc_html( (string) $row['id'] ); ?></td>
-									<td><code><?php echo esc_html( $row['batch_id'] ); ?></code></td>
-									<td><?php echo esc_html( $row['site_name'] . ( '' !== $row['site_url'] ? ' (' . $row['site_url'] . ')' : '' ) ); ?></td>
-									<td><?php echo esc_html( $row['item_label'] . ( '' !== $row['item_type'] ? ' [' . $row['item_type'] . ':' . $row['item_slug'] . ']' : '' ) ); ?></td>
-									<td><?php echo esc_html( $row['status'] ); ?></td>
-									<td style="min-width:120px;">
-										<div style="background:#ececec;border-radius:4px;overflow:hidden;height:10px;margin-bottom:4px;">
-											<div style="background:#2271b1;height:10px;width:<?php echo esc_attr( (string) max( 0, min( 100, (int) $row['progress'] ) ) ); ?>%;"></div>
-										</div>
-										<?php echo esc_html( (string) (int) $row['progress'] ); ?>%
-									</td>
-									<td><?php echo esc_html( sprintf( '%d/%d', (int) $row['attempts'], (int) $row['max_attempts'] ) ); ?></td>
-									<td><code><?php echo esc_html( isset( $row['reason_code'] ) ? (string) $row['reason_code'] : '' ); ?></code></td>
-									<td><?php echo esc_html( $row['message'] ); ?></td>
-									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $row['updated_at'] ) ? $row['updated_at'] : '' ) ); ?></td>
-								</tr>
-							<?php endforeach; ?>
-						<?php endif; ?>
-					</tbody>
-				</table>
-				<script>
-				(function() {
-					var hasPending = <?php echo (int) ( $has_pending ? 1 : 0 ); ?>;
-					var paused = <?php echo (int) ( $queue_paused ? 1 : 0 ); ?>;
-					var ajaxNonce = <?php echo wp_json_encode( $ajax_nonce ); ?>;
-					var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-					var browserWorkerCheckbox = document.getElementById('rawatwp-browser-worker-enable');
-					var workerBusy = false;
+							<tr>
+								<th scope="row">Pilih Child Site</th>
+								<td>
+									<label style="display:block;margin-bottom:8px;">
+										<input type="checkbox" id="rawatwp-select-all-sites" />
+										Pilih semua child site
+									</label>
+									<div class="rawatwp-updates-site-list">
+										<?php foreach ( $child_sites as $site ) : ?>
+											<?php
+											$site_url    = isset( $site['site_url'] ) ? (string) $site['site_url'] : '';
+											$needs_count = isset( $needs_by_url[ $site_url ] ) ? (int) $needs_by_url[ $site_url ] : 0;
+											?>
+											<label class="rawatwp-updates-site-item">
+												<input class="rawatwp-site-check" type="checkbox" name="site_ids[]" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
+												<?php echo esc_html( $site['site_name'] . ' (' . $site_url . ')' ); ?>
+												<span class="rawatwp-updates-site-meta">
+													<?php
+													echo esc_html(
+														sprintf(
+															' | Status: %s | Butuh update: %d item',
+															isset( $site['connection_status'] ) ? (string) $site['connection_status'] : '-',
+															$needs_count
+														)
+													);
+													?>
+												</span>
+											</label>
+										<?php endforeach; ?>
+									</div>
+								</td>
+							</tr>
+						</table>
+						<?php submit_button( 'Kirim Update Sekarang' ); ?>
+					</form>
 
-					function runBrowserWorkerStep() {
-						if (!hasPending || paused || workerBusy) {
+					<h2>Progress Update</h2>
+					<table class="widefat striped">
+						<thead>
+							<tr>
+								<th>Site</th>
+								<th>Package</th>
+								<th>Status</th>
+								<th>Progress</th>
+								<th>Updated</th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php if ( empty( $queue_rows ) ) : ?>
+								<tr>
+									<td colspan="5">Belum ada proses update.</td>
+								</tr>
+							<?php else : ?>
+								<?php foreach ( $queue_rows as $row ) : ?>
+									<?php
+									$status_key   = isset( $row['status'] ) ? sanitize_key( (string) $row['status'] ) : '';
+									$status_label = isset( $status_labels[ $status_key ] ) ? $status_labels[ $status_key ] : ucfirst( $status_key );
+									$detail_text  = '';
+									if ( 'failed' === $status_key ) {
+										$detail_text = '' !== (string) $row['message'] ? (string) $row['message'] : ( isset( $row['reason_code'] ) ? (string) $row['reason_code'] : '' );
+									}
+									?>
+									<tr>
+										<td><?php echo esc_html( $row['site_name'] . ( '' !== $row['site_url'] ? ' (' . $row['site_url'] . ')' : '' ) ); ?></td>
+										<td><?php echo esc_html( $row['item_label'] . ( '' !== $row['item_type'] ? ' [' . $row['item_type'] . ':' . $row['item_slug'] . ']' : '' ) ); ?></td>
+										<td>
+											<span class="rawatwp-status-badge rawatwp-status-<?php echo esc_attr( $status_key ); ?>"><?php echo esc_html( $status_label ); ?></span>
+											<?php if ( '' !== $detail_text ) : ?>
+												<div class="description"><?php echo esc_html( $detail_text ); ?></div>
+											<?php endif; ?>
+										</td>
+										<td style="min-width:120px;">
+											<div class="rawatwp-progress-wrap">
+												<div class="rawatwp-progress-bar" style="width:<?php echo esc_attr( (string) max( 0, min( 100, (int) $row['progress'] ) ) ); ?>%;"></div>
+											</div>
+											<?php echo esc_html( (string) (int) $row['progress'] ); ?>%
+										</td>
+										<td><?php echo esc_html( $this->format_datetime_for_display( isset( $row['updated_at'] ) ? $row['updated_at'] : '' ) ); ?></td>
+									</tr>
+								<?php endforeach; ?>
+							<?php endif; ?>
+						</tbody>
+					</table>
+
+					<details class="rawatwp-advanced-updates">
+						<summary>Pengaturan Lanjutan</summary>
+						<p style="margin-top:10px;"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
+						<form style="margin:8px 0 10px 0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<?php wp_nonce_field( 'rawatwp_regenerate_runner_token' ); ?>
+							<input type="hidden" name="action" value="rawatwp_regenerate_runner_token" />
+							<?php submit_button( 'Regenerate Runner Token', 'secondary', 'submit', false ); ?>
+						</form>
+						<p class="description">URL runner untuk system cron (1 menit sekali):</p>
+						<p><code style="word-break:break-all;"><?php echo esc_html( $runner_url ); ?></code></p>
+					</details>
+					<script>
+					(function() {
+						var hasPending = <?php echo (int) ( $has_pending ? 1 : 0 ); ?>;
+						var paused = <?php echo (int) ( $queue_paused ? 1 : 0 ); ?>;
+						var ajaxNonce = <?php echo wp_json_encode( $ajax_nonce ); ?>;
+						var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+						var browserWorkerCheckbox = document.getElementById('rawatwp-browser-worker-enable');
+						var selectAllSites = document.getElementById('rawatwp-select-all-sites');
+						var siteChecks = document.querySelectorAll('.rawatwp-site-check');
+						var workerBusy = false;
+
+						if (selectAllSites) {
+							selectAllSites.addEventListener('change', function() {
+								siteChecks.forEach(function(item) {
+									item.checked = selectAllSites.checked;
+								});
+							});
+						}
+
+						function runBrowserWorkerStep() {
+							if (!hasPending || paused || workerBusy) {
 							return;
 						}
 						if (!browserWorkerCheckbox || !browserWorkerCheckbox.checked) {
