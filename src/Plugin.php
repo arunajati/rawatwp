@@ -98,6 +98,7 @@ class Plugin {
 			add_action( 'rest_api_init', array( $this->api_manager, 'register_routes' ) );
 			add_action( 'admin_menu', array( $this->admin_pages, 'register_menus' ) );
 			add_action( 'admin_init', array( $this->admin_pages, 'register_admin_actions' ) );
+			add_action( 'admin_enqueue_scripts', array( $this->admin_pages, 'enqueue_assets' ) );
 			add_action( 'admin_notices', array( $this->admin_pages, 'render_plugins_page_notices' ) );
 			add_filter( 'plugin_row_meta', array( $this->admin_pages, 'add_plugin_row_meta_check_update' ), 10, 4 );
 

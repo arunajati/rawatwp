@@ -1,0 +1,240 @@
+.rawatwp-admin {
+	max-width: 1280px;
+}
+
+.rawatwp-admin .rawatwp-page-subtitle {
+	margin: -4px 0 14px;
+	color: #646970;
+}
+
+.rawatwp-admin .rawatwp-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 10px;
+	padding: 16px 18px;
+	margin-bottom: 14px;
+	box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.rawatwp-admin .rawatwp-card > h2 {
+	margin-top: 0;
+	margin-bottom: 12px;
+	font-size: 20px;
+}
+
+.rawatwp-admin .rawatwp-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 12px;
+}
+
+.rawatwp-admin .rawatwp-toolbar form {
+	margin: 0;
+}
+
+.rawatwp-admin .rawatwp-inline-form {
+	display: inline-block;
+	margin: 0;
+}
+
+.rawatwp-admin .rawatwp-muted {
+	color: #646970;
+}
+
+.rawatwp-admin .widefat {
+	margin-top: 10px;
+}
+
+.rawatwp-admin .widefat thead th {
+	font-weight: 600;
+}
+
+.rawatwp-admin .form-table th {
+	width: 220px;
+}
+
+.rawatwp-admin .description {
+	color: #646970;
+}
+
+.rawatwp-admin .rawatwp-sites-table th,
+.rawatwp-admin .rawatwp-sites-table td {
+	vertical-align: middle;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-id {
+	width: 42px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-site {
+	width: 170px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain {
+	width: 38%;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-key {
+	width: 110px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-status {
+	width: 95px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-last-seen {
+	width: 150px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-action {
+	width: 155px;
+	white-space: nowrap;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-domain {
+	word-break: break-word;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-key-wrap {
+	display: inline-flex;
+	align-items: center;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-action-form {
+	margin: 0;
+}
+
+.rawatwp-admin .rawatwp-package-bulk-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 14px;
+}
+
+.rawatwp-admin .rawatwp-package-bulk-actions select {
+	min-width: 180px;
+}
+
+.rawatwp-admin .rawatwp-package-table {
+	margin-top: 0;
+}
+
+.rawatwp-admin .rawatwp-update-kpis {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 10px;
+	margin: 0 0 16px;
+}
+
+.rawatwp-admin .rawatwp-update-kpi {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 10px 12px;
+}
+
+.rawatwp-admin .rawatwp-update-kpi .label {
+	display: block;
+	font-size: 12px;
+	color: #50575e;
+	margin-bottom: 6px;
+}
+
+.rawatwp-admin .rawatwp-update-kpi .value {
+	display: block;
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.rawatwp-admin .rawatwp-updates-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 14px;
+}
+
+.rawatwp-admin .rawatwp-updates-site-list {
+	max-height: 220px;
+	overflow: auto;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 10px;
+	background: #fff;
+}
+
+.rawatwp-admin .rawatwp-updates-site-item {
+	display: block;
+	margin: 0 0 8px;
+}
+
+.rawatwp-admin .rawatwp-updates-site-meta {
+	color: #646970;
+	font-size: 12px;
+}
+
+.rawatwp-admin .rawatwp-status-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.5;
+}
+
+.rawatwp-admin .rawatwp-status-on_queue,
+.rawatwp-admin .rawatwp-status-processing {
+	background: #f0f6fc;
+	color: #0a4b78;
+}
+
+.rawatwp-admin .rawatwp-status-success {
+	background: #edfaef;
+	color: #146c2e;
+}
+
+.rawatwp-admin .rawatwp-status-failed {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.rawatwp-admin .rawatwp-progress-wrap {
+	background: #ececec;
+	border-radius: 4px;
+	overflow: hidden;
+	height: 10px;
+	margin-bottom: 4px;
+}
+
+.rawatwp-admin .rawatwp-progress-bar {
+	background: #2271b1;
+	height: 10px;
+}
+
+.rawatwp-admin .rawatwp-advanced-updates {
+	margin-top: 12px;
+	padding: 10px 12px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+}
+
+@media (max-width: 960px) {
+	.rawatwp-admin .form-table th,
+	.rawatwp-admin .form-table td {
+		display: block;
+		width: 100%;
+		padding-right: 0;
+	}
+
+	.rawatwp-admin .form-table th {
+		padding-bottom: 6px;
+	}
+
+	.rawatwp-admin .rawatwp-updates-site-list {
+		max-height: 280px;
+	}
+}

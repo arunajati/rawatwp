@@ -136,6 +136,26 @@ class AdminPages {
 	}
 
 	/**
+	 * Enqueue RawatWP admin assets.
+	 *
+	 * @param string $hook_suffix Current admin page hook.
+	 * @return void
+	 */
+	public function enqueue_assets( $hook_suffix ) {
+		$hook_suffix = sanitize_text_field( (string) $hook_suffix );
+		if ( false === strpos( $hook_suffix, 'rawatwp' ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'rawatwp-admin',
+			RAWATWP_URL . 'assets/css/admin.css',
+			array(),
+			RAWATWP_VERSION
+		);
+	}
+
+	/**
 	 * Register admin-post handlers.
 	 *
 	 * @return void
@@ -212,16 +232,18 @@ class AdminPages {
 		$mode = $this->mode_manager->get_mode();
 		$delete_all_on_uninstall = '1' === (string) get_option( 'rawatwp_delete_all_on_uninstall', '0' );
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - General</h1>
+			<p class="rawatwp-page-subtitle">Pengaturan utama plugin RawatWP.</p>
 			<?php $this->render_notices(); ?>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<?php wp_nonce_field( 'rawatwp_save_general_settings' ); ?>
-				<input type="hidden" name="action" value="rawatwp_save_general_settings" />
-				<table class="form-table" role="presentation">
-					<tr>
-						<th scope="row"><label for="rawatwp_mode">Mode Aktif</label></th>
-						<td>
+			<div class="rawatwp-card">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<?php wp_nonce_field( 'rawatwp_save_general_settings' ); ?>
+					<input type="hidden" name="action" value="rawatwp_save_general_settings" />
+					<table class="form-table" role="presentation">
+						<tr>
+							<th scope="row"><label for="rawatwp_mode">Mode Aktif</label></th>
+							<td>
 								<select id="rawatwp_mode" name="rawatwp_mode">
 									<option value="">Pilih Mode</option>
 									<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
@@ -243,13 +265,14 @@ class AdminPages {
 					<?php submit_button( 'Simpan Pengaturan' ); ?>
 				</form>
 
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'rawatwp_check_update_now' ); ?>
 					<input type="hidden" name="action" value="rawatwp_check_update_now" />
 					<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
 				</form>
 			</div>
-			<?php
+		</div>
+		<?php
 	}
 
 	/**
@@ -261,11 +284,14 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Connection</h1>
+			<p class="rawatwp-page-subtitle">Hubungkan site Child ke Master.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'child' !== $mode ) : ?>
-				<p>Halaman ini aktif hanya untuk mode Child.</p>
+				<div class="rawatwp-card">
+					<p>Halaman ini aktif hanya untuk mode Child.</p>
+				</div>
 			<?php else : ?>
 				<?php
 				$settings      = $this->child_manager->get_settings();
@@ -276,28 +302,30 @@ class AdminPages {
 				$button_style  = $is_connected ? 'secondary' : 'primary';
 				$required_attr = $is_connected ? '' : 'required';
 				?>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( $nonce_action ); ?>
-					<input type="hidden" name="action" value="<?php echo esc_attr( $form_action ); ?>" />
-					<table class="form-table" role="presentation">
-						<tr>
-							<th scope="row"><label for="master_url">Master URL</label></th>
-							<td><input class="regular-text" type="url" id="master_url" name="master_url" value="<?php echo esc_attr( $settings['master_url'] ); ?>" <?php echo esc_attr( $required_attr ); ?> /></td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="security_key">Security Key</label></th>
-							<td><input class="regular-text" type="text" id="security_key" name="security_key" value="<?php echo esc_attr( $settings['security_key'] ); ?>" <?php echo esc_attr( $required_attr ); ?> /></td>
-						</tr>
-					</table>
-					<?php submit_button( $button_label, $button_style ); ?>
-				</form>
-				<p><strong>Status:</strong> <?php echo $is_connected ? 'Connected' : 'Not connected'; ?></p>
-				<?php if ( ! empty( $settings['last_connected_at'] ) ) : ?>
-					<p><strong>Last connected:</strong> <?php echo esc_html( $this->format_datetime_for_display( $settings['last_connected_at'] ) ); ?></p>
-				<?php endif; ?>
-				<?php if ( ! empty( $settings['child_id'] ) ) : ?>
-					<p><strong>Child ID:</strong> <?php echo esc_html( (string) $settings['child_id'] ); ?></p>
-				<?php endif; ?>
+				<div class="rawatwp-card">
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( $nonce_action ); ?>
+						<input type="hidden" name="action" value="<?php echo esc_attr( $form_action ); ?>" />
+						<table class="form-table" role="presentation">
+							<tr>
+								<th scope="row"><label for="master_url">Master URL</label></th>
+								<td><input class="regular-text" type="url" id="master_url" name="master_url" value="<?php echo esc_attr( $settings['master_url'] ); ?>" <?php echo esc_attr( $required_attr ); ?> /></td>
+							</tr>
+							<tr>
+								<th scope="row"><label for="security_key">Security Key</label></th>
+								<td><input class="regular-text" type="text" id="security_key" name="security_key" value="<?php echo esc_attr( $settings['security_key'] ); ?>" <?php echo esc_attr( $required_attr ); ?> /></td>
+							</tr>
+						</table>
+						<?php submit_button( $button_label, $button_style ); ?>
+					</form>
+					<p><strong>Status:</strong> <?php echo $is_connected ? 'Connected' : 'Not connected'; ?></p>
+					<?php if ( ! empty( $settings['last_connected_at'] ) ) : ?>
+						<p><strong>Last connected:</strong> <?php echo esc_html( $this->format_datetime_for_display( $settings['last_connected_at'] ) ); ?></p>
+					<?php endif; ?>
+					<?php if ( ! empty( $settings['child_id'] ) ) : ?>
+						<p><strong>Child ID:</strong> <?php echo esc_html( (string) $settings['child_id'] ); ?></p>
+					<?php endif; ?>
+				</div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -312,74 +340,81 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Monitored Items</h1>
+			<p class="rawatwp-page-subtitle">Kelola item plugin/theme yang dipantau pada mode Child.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'child' !== $mode ) : ?>
-				<p>Halaman ini aktif hanya untuk mode Child.</p>
+				<div class="rawatwp-card">
+					<p>Halaman ini aktif hanya untuk mode Child.</p>
+				</div>
 			<?php else : ?>
-				<p><strong>Alur paling mudah:</strong> 1) Klik scan plugin/theme, 2) tandai item yang butuh update, 3) klik kirim report ke Master.</p>
+				<div class="rawatwp-card">
+					<p><strong>Alur paling mudah:</strong> 1) Klik scan plugin/theme, 2) tandai item yang butuh update, 3) klik kirim report ke Master.</p>
 
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_scan_installed_items' ); ?>
-					<input type="hidden" name="action" value="rawatwp_scan_installed_items" />
-					<?php submit_button( '1) Scan Plugin & Theme Terpasang', 'primary' ); ?>
-				</form>
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_scan_installed_items' ); ?>
+						<input type="hidden" name="action" value="rawatwp_scan_installed_items" />
+						<?php submit_button( '1) Scan Plugin & Theme Terpasang', 'primary', 'submit', false ); ?>
+					</form>
 
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_scan_now' ); ?>
-					<input type="hidden" name="action" value="rawatwp_scan_now" />
-					<?php submit_button( '3) Kirim Report ke Master', 'secondary' ); ?>
-				</form>
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_scan_now' ); ?>
+						<input type="hidden" name="action" value="rawatwp_scan_now" />
+						<?php submit_button( '3) Kirim Report ke Master', 'secondary', 'submit', false ); ?>
+					</form>
+				</div>
 
-				<h2>Daftar Monitored Items</h2>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th>Type</th>
-							<th>Slug</th>
-							<th>Label</th>
-							<th>Current Version</th>
-							<th>Needs Update</th>
-							<th>Action</th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php
-						$monitored_items = $this->monitored_items->get_items();
-						if ( empty( $monitored_items ) ) :
-							?>
+				<div class="rawatwp-card">
+					<h2>Daftar Monitored Items</h2>
+					<table class="widefat striped">
+						<thead>
 							<tr>
-								<td colspan="6">Belum ada item. Klik tombol scan agar plugin/theme otomatis masuk ke daftar.</td>
+								<th>Type</th>
+								<th>Slug</th>
+								<th>Label</th>
+								<th>Current Version</th>
+								<th>Needs Update</th>
+								<th>Action</th>
 							</tr>
-						<?php else : ?>
-							<?php foreach ( $monitored_items as $item ) : ?>
-							<tr>
-								<td><?php echo esc_html( $item['type'] ); ?></td>
-								<td><?php echo esc_html( $item['slug'] ); ?></td>
-								<td><?php echo esc_html( $item['label'] ); ?></td>
-								<td><?php echo esc_html( $item['current_version'] ); ?></td>
-								<td><?php echo ! empty( $item['needs_update'] ) ? 'Yes' : 'No'; ?></td>
-								<td>
-									<form style="display:inline-block;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-										<?php wp_nonce_field( 'rawatwp_toggle_item' ); ?>
-										<input type="hidden" name="action" value="rawatwp_toggle_item" />
-										<input type="hidden" name="item_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
-										<input type="hidden" name="needs_update" value="<?php echo ! empty( $item['needs_update'] ) ? '0' : '1'; ?>" />
-										<button class="button" type="submit"><?php echo ! empty( $item['needs_update'] ) ? 'Sudah Aman' : 'Butuh Update'; ?></button>
-									</form>
-									<form style="display:inline-block;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-										<?php wp_nonce_field( 'rawatwp_delete_item' ); ?>
-										<input type="hidden" name="action" value="rawatwp_delete_item" />
-										<input type="hidden" name="item_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
-										<button class="button button-link-delete" type="submit">Delete</button>
-									</form>
-								</td>
-							</tr>
-							<?php endforeach; ?>
-						<?php endif; ?>
-					</tbody>
-				</table>
+						</thead>
+						<tbody>
+							<?php
+							$monitored_items = $this->monitored_items->get_items();
+							if ( empty( $monitored_items ) ) :
+								?>
+								<tr>
+									<td colspan="6">Belum ada item. Klik tombol scan agar plugin/theme otomatis masuk ke daftar.</td>
+								</tr>
+							<?php else : ?>
+								<?php foreach ( $monitored_items as $item ) : ?>
+								<tr>
+									<td><?php echo esc_html( $item['type'] ); ?></td>
+									<td><?php echo esc_html( $item['slug'] ); ?></td>
+									<td><?php echo esc_html( $item['label'] ); ?></td>
+									<td><?php echo esc_html( $item['current_version'] ); ?></td>
+									<td><?php echo ! empty( $item['needs_update'] ) ? 'Yes' : 'No'; ?></td>
+									<td>
+										<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+											<?php wp_nonce_field( 'rawatwp_toggle_item' ); ?>
+											<input type="hidden" name="action" value="rawatwp_toggle_item" />
+											<input type="hidden" name="item_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
+											<input type="hidden" name="needs_update" value="<?php echo ! empty( $item['needs_update'] ) ? '0' : '1'; ?>" />
+											<button class="button" type="submit"><?php echo ! empty( $item['needs_update'] ) ? 'Sudah Aman' : 'Butuh Update'; ?></button>
+										</form>
+										<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+											<?php wp_nonce_field( 'rawatwp_delete_item' ); ?>
+											<input type="hidden" name="action" value="rawatwp_delete_item" />
+											<input type="hidden" name="item_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
+											<button class="button button-link-delete" type="submit">Delete</button>
+										</form>
+									</td>
+								</tr>
+								<?php endforeach; ?>
+							<?php endif; ?>
+						</tbody>
+					</table>
+				</div>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -394,90 +429,58 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Sites</h1>
+			<p class="rawatwp-page-subtitle">Kelola daftar child site yang terhubung ke Master.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'master' !== $mode ) : ?>
-				<p>Halaman ini aktif hanya untuk mode Master.</p>
+				<div class="rawatwp-card">
+					<p>Halaman ini aktif hanya untuk mode Master.</p>
+				</div>
 			<?php else : ?>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_add_site' ); ?>
-					<input type="hidden" name="action" value="rawatwp_add_site" />
-					<table class="form-table" role="presentation">
-						<tr>
-							<th scope="row">Nama Site Child</th>
-							<td><input class="regular-text" type="text" name="site_name" required /></td>
-						</tr>
-						<tr>
-							<th scope="row">Domain / URL Child</th>
-							<td><input class="regular-text" type="url" name="site_url" required /></td>
-						</tr>
-					</table>
-					<?php submit_button( 'Tambah Child Site (Pre-register)' ); ?>
-				</form>
+				<div class="rawatwp-card">
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_add_site' ); ?>
+						<input type="hidden" name="action" value="rawatwp_add_site" />
+						<table class="form-table" role="presentation">
+							<tr>
+								<th scope="row">Nama Site Child</th>
+								<td><input class="regular-text" type="text" name="site_name" required /></td>
+							</tr>
+							<tr>
+								<th scope="row">Domain / URL Child</th>
+								<td><input class="regular-text" type="url" name="site_url" required /></td>
+							</tr>
+						</table>
+						<?php submit_button( 'Tambah Child Site (Pre-register)' ); ?>
+					</form>
+				</div>
 
+				<div class="rawatwp-card">
 					<h2>Daftar Child Sites</h2>
-					<style>
-						.rawatwp-sites-table th,
-						.rawatwp-sites-table td {
-							vertical-align: middle;
-						}
-						.rawatwp-sites-table .rawatwp-col-id {
-							width: 42px;
-						}
-						.rawatwp-sites-table .rawatwp-col-site {
-							width: 170px;
-						}
-						.rawatwp-sites-table .rawatwp-col-domain {
-							width: 38%;
-						}
-						.rawatwp-sites-table .rawatwp-col-key {
-							width: 110px;
-						}
-						.rawatwp-sites-table .rawatwp-col-status {
-							width: 95px;
-						}
-						.rawatwp-sites-table .rawatwp-col-last-seen {
-							width: 150px;
-						}
-						.rawatwp-sites-table .rawatwp-col-action {
-							width: 155px;
-							white-space: nowrap;
-						}
-						.rawatwp-sites-table .rawatwp-domain {
-							word-break: break-word;
-						}
-						.rawatwp-sites-table .rawatwp-key-wrap {
-							display: inline-flex;
-							align-items: center;
-						}
-						.rawatwp-sites-table .rawatwp-action-form {
-							margin: 0;
-						}
-						</style>
 					<table class="widefat striped rawatwp-sites-table">
 						<thead>
-								<tr>
-									<th class="rawatwp-col-id">ID</th>
-									<th class="rawatwp-col-site">Nama Site</th>
-									<th class="rawatwp-col-domain">Domain</th>
-									<th class="rawatwp-col-key">Security Key</th>
-									<th class="rawatwp-col-status">Status</th>
-									<th class="rawatwp-col-last-seen">Last Seen</th>
-									<th class="rawatwp-col-action">Action</th>
-								</tr>
-							</thead>
+							<tr>
+								<th class="rawatwp-col-id">ID</th>
+								<th class="rawatwp-col-site">Nama Site</th>
+								<th class="rawatwp-col-domain">Domain</th>
+								<th class="rawatwp-col-key">Security Key</th>
+								<th class="rawatwp-col-status">Status</th>
+								<th class="rawatwp-col-last-seen">Last Seen</th>
+								<th class="rawatwp-col-action">Action</th>
+							</tr>
+						</thead>
 						<tbody>
 							<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
 								<tr>
 									<td class="rawatwp-col-id"><?php echo esc_html( (string) $site['id'] ); ?></td>
 									<td class="rawatwp-col-site"><?php echo esc_html( $site['site_name'] ); ?></td>
-										<td class="rawatwp-domain rawatwp-col-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
-										<td class="rawatwp-col-key">
-											<div class="rawatwp-key-wrap">
-												<button
-													type="button"
-													class="button rawatwp-copy-key"
+									<td class="rawatwp-domain rawatwp-col-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
+									<td class="rawatwp-col-key">
+										<div class="rawatwp-key-wrap">
+											<button
+												type="button"
+												class="button rawatwp-copy-key"
 												data-copy-text="<?php echo esc_attr( $site['security_key'] ); ?>"
 											>
 												Copy
@@ -493,11 +496,12 @@ class AdminPages {
 											<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
 										<button class="button" type="submit">Regenerate Key</button>
 									</form>
-								</td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
 
 				<script>
 				(function() {
@@ -551,16 +555,20 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Packages</h1>
+			<p class="rawatwp-page-subtitle">Upload, scan, dan kelola package update.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'master' !== $mode ) : ?>
-				<p>Halaman ini aktif hanya untuk mode Master.</p>
+				<div class="rawatwp-card">
+					<p>Halaman ini aktif hanya untuk mode Master.</p>
+				</div>
 			<?php else : ?>
-				<form id="rawatwp-package-upload-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
-					<input type="hidden" name="action" value="rawatwp_upload_package" />
-					<table class="form-table" role="presentation">
+				<div class="rawatwp-card">
+					<form id="rawatwp-package-upload-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
+						<input type="hidden" name="action" value="rawatwp_upload_package" />
+						<table class="form-table" role="presentation">
 							<tr>
 								<th scope="row">File ZIP</th>
 								<td>
@@ -571,31 +579,19 @@ class AdminPages {
 									</p>
 								</td>
 							</tr>
-					</table>
-					<?php submit_button( 'Upload Package ZIP', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
-				</form>
+						</table>
+						<?php submit_button( 'Upload Package ZIP', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
+					</form>
 
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
-					<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
-					<?php submit_button( 'Scan Available Packages', 'secondary' ); ?>
-				</form>
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
+						<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
+						<?php submit_button( 'Scan Available Packages', 'secondary', 'submit', false ); ?>
+					</form>
+				</div>
 
+				<div class="rawatwp-card">
 					<h2>Daftar Package</h2>
-					<style>
-					.rawatwp-package-bulk-actions {
-						display: flex;
-						align-items: center;
-						gap: 8px;
-						margin: 0 0 14px 0;
-					}
-					.rawatwp-package-bulk-actions select {
-						min-width: 180px;
-					}
-					.rawatwp-package-table {
-						margin-top: 0;
-					}
-					</style>
 					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File ZIP dan data package akan dihapus permanen.');">
 						<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
 						<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
@@ -657,10 +653,11 @@ class AdminPages {
 							<?php endforeach; ?>
 						<?php endif; ?>
 					</tbody>
-				</table>
+					</table>
+				</div>
 
-				<script>
-				(function() {
+					<script>
+					(function() {
 					var checkAll = document.getElementById('rawatwp-check-all-packages');
 					var rowChecks = document.querySelectorAll('.rawatwp-package-check');
 
@@ -761,11 +758,14 @@ class AdminPages {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
 		?>
-			<div class="wrap">
+			<div class="wrap rawatwp-admin">
 				<h1>RawatWP - Updates</h1>
+				<p class="rawatwp-page-subtitle">Kirim update ke child site dengan alur yang sederhana.</p>
 				<?php $this->render_notices(); ?>
 				<?php if ( 'master' !== $mode ) : ?>
-					<p>Halaman ini aktif hanya untuk mode Master.</p>
+					<div class="rawatwp-card">
+						<p>Halaman ini aktif hanya untuk mode Master.</p>
+					</div>
 				<?php else : ?>
 					<?php
 					$packages          = $this->package_manager->get_packages();
@@ -808,97 +808,9 @@ class AdminPages {
 						'failed'     => 'Gagal',
 					);
 					?>
-					<style>
-					.rawatwp-update-kpis {
-						display: grid;
-						grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-						gap: 10px;
-						margin: 0 0 16px 0;
-					}
-					.rawatwp-update-kpi {
-						background: #fff;
-						border: 1px solid #dcdcde;
-						border-radius: 6px;
-						padding: 10px 12px;
-					}
-					.rawatwp-update-kpi .label {
-						display: block;
-						font-size: 12px;
-						color: #50575e;
-						margin-bottom: 6px;
-					}
-					.rawatwp-update-kpi .value {
-						display: block;
-						font-size: 22px;
-						font-weight: 600;
-						line-height: 1.2;
-					}
-					.rawatwp-updates-controls {
-						display: flex;
-						flex-wrap: wrap;
-						align-items: center;
-						gap: 8px;
-						margin: 0 0 14px 0;
-					}
-					.rawatwp-updates-site-list {
-						max-height: 220px;
-						overflow: auto;
-						border: 1px solid #dcdcde;
-						border-radius: 6px;
-						padding: 10px;
-						background: #fff;
-					}
-					.rawatwp-updates-site-item {
-						display: block;
-						margin: 0 0 8px 0;
-					}
-					.rawatwp-updates-site-meta {
-						color: #646970;
-						font-size: 12px;
-					}
-					.rawatwp-status-badge {
-						display: inline-block;
-						padding: 2px 8px;
-						border-radius: 999px;
-						font-size: 12px;
-						font-weight: 600;
-						line-height: 1.5;
-					}
-					.rawatwp-status-on_queue,
-					.rawatwp-status-processing {
-						background: #f0f6fc;
-						color: #0a4b78;
-					}
-					.rawatwp-status-success {
-						background: #edfaef;
-						color: #146c2e;
-					}
-					.rawatwp-status-failed {
-						background: #fcf0f1;
-						color: #8a2424;
-					}
-					.rawatwp-progress-wrap {
-						background: #ececec;
-						border-radius: 4px;
-						overflow: hidden;
-						height: 10px;
-						margin-bottom: 4px;
-					}
-					.rawatwp-progress-bar {
-						background: #2271b1;
-						height: 10px;
-					}
-					.rawatwp-advanced-updates {
-						margin-top: 12px;
-						padding: 10px 12px;
-						background: #fff;
-						border: 1px solid #dcdcde;
-						border-radius: 6px;
-					}
-					</style>
-
-					<h2>Ringkasan Cepat</h2>
-					<div class="rawatwp-update-kpis">
+					<div class="rawatwp-card">
+						<h2>Ringkasan Cepat</h2>
+						<div class="rawatwp-update-kpis">
 						<div class="rawatwp-update-kpi">
 							<span class="label">Total Child Site</span>
 							<span class="value"><?php echo esc_html( (string) count( $child_sites ) ); ?></span>
@@ -914,27 +826,29 @@ class AdminPages {
 						<div class="rawatwp-update-kpi">
 							<span class="label">Berhasil / Gagal</span>
 							<span class="value"><?php echo esc_html( (string) $success_count . ' / ' . (string) $failed_count ); ?></span>
+							</div>
 						</div>
+
+						<div class="rawatwp-updates-controls">
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
+								<input type="hidden" name="action" value="rawatwp_queue_run_now" />
+								<?php submit_button( 'Proses Queue Sekarang', 'secondary', 'submit', false ); ?>
+							</form>
+
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+								<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
+								<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
+								<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
+								<?php submit_button( $queue_paused ? 'Lanjutkan Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
+							</form>
+						</div>
+						<p class="description">Status queue saat ini: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
 					</div>
 
-					<div class="rawatwp-updates-controls">
-						<form style="margin:0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-							<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
-							<input type="hidden" name="action" value="rawatwp_queue_run_now" />
-							<?php submit_button( 'Proses Queue Sekarang', 'secondary', 'submit', false ); ?>
-						</form>
-
-						<form style="margin:0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-							<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
-							<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
-							<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
-							<?php submit_button( $queue_paused ? 'Lanjutkan Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
-						</form>
-					</div>
-					<p class="description">Status queue saat ini: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
-
-					<h2>Kirim Update</h2>
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<div class="rawatwp-card">
+						<h2>Kirim Update</h2>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
 						<input type="hidden" name="action" value="rawatwp_push_update" />
 						<table class="form-table" role="presentation">
@@ -983,10 +897,12 @@ class AdminPages {
 							</tr>
 						</table>
 						<?php submit_button( 'Kirim Update Sekarang' ); ?>
-					</form>
+						</form>
+					</div>
 
-					<h2>Progress Update</h2>
-					<table class="widefat striped">
+					<div class="rawatwp-card">
+						<h2>Progress Update</h2>
+						<table class="widefat striped">
 						<thead>
 							<tr>
 								<th>Site</th>
@@ -1031,19 +947,20 @@ class AdminPages {
 								<?php endforeach; ?>
 							<?php endif; ?>
 						</tbody>
-					</table>
+						</table>
 
-					<details class="rawatwp-advanced-updates">
-						<summary>Pengaturan Lanjutan</summary>
-						<p style="margin-top:10px;"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
-						<form style="margin:8px 0 10px 0;" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<details class="rawatwp-advanced-updates">
+							<summary>Pengaturan Lanjutan</summary>
+							<p style="margin-top:10px;"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<?php wp_nonce_field( 'rawatwp_regenerate_runner_token' ); ?>
 							<input type="hidden" name="action" value="rawatwp_regenerate_runner_token" />
 							<?php submit_button( 'Regenerate Runner Token', 'secondary', 'submit', false ); ?>
-						</form>
-						<p class="description">URL runner untuk system cron (1 menit sekali):</p>
-						<p><code style="word-break:break-all;"><?php echo esc_html( $runner_url ); ?></code></p>
-					</details>
+							</form>
+							<p class="description">URL runner untuk system cron (1 menit sekali):</p>
+							<p><code style="word-break:break-all;"><?php echo esc_html( $runner_url ); ?></code></p>
+						</details>
+					</div>
 					<script>
 					(function() {
 						var hasPending = <?php echo (int) ( $has_pending ? 1 : 0 ); ?>;
@@ -1114,41 +1031,44 @@ class AdminPages {
 		$this->logger->maybe_run_maintenance( 30, 10000, 1800 );
 		$logs = $this->logger->get_logs( 300 );
 		?>
-		<div class="wrap">
+		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Logs</h1>
+			<p class="rawatwp-page-subtitle">Riwayat aktivitas update dan koneksi RawatWP.</p>
 			<?php $this->render_notices(); ?>
-			<p>Log otomatis dirawat: hapus data lebih dari 30 hari dan batasi maksimal 10.000 baris terbaru agar database tetap ringan.</p>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear semua log RawatWP?');">
-				<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
-				<input type="hidden" name="action" value="rawatwp_clear_logs" />
-				<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
-			</form>
-			<table class="widefat striped">
-				<thead>
-					<tr>
-						<th>Time</th>
-						<th>Site</th>
-						<th>Mode</th>
-						<th>Item</th>
-						<th>Action</th>
-						<th>Status</th>
-						<th>Message</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $logs as $log ) : ?>
+			<div class="rawatwp-card">
+				<p>Log otomatis dirawat: hapus data lebih dari 30 hari dan batasi maksimal 10.000 baris terbaru agar database tetap ringan.</p>
+				<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear semua log RawatWP?');">
+					<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
+					<input type="hidden" name="action" value="rawatwp_clear_logs" />
+					<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
+				</form>
+				<table class="widefat striped">
+					<thead>
 						<tr>
-							<td><?php echo esc_html( $this->format_datetime_for_display( isset( $log['created_at'] ) ? $log['created_at'] : '' ) ); ?></td>
-							<td><?php echo esc_html( $log['site_url'] ); ?></td>
-							<td><?php echo esc_html( $log['mode'] ); ?></td>
-							<td><?php echo esc_html( trim( $log['item_type'] . ':' . $log['item_slug'], ':' ) ); ?></td>
-							<td><?php echo esc_html( $log['action'] ); ?></td>
-							<td><?php echo esc_html( $log['status'] ); ?></td>
-							<td><?php echo esc_html( $log['message'] ); ?></td>
+							<th>Time</th>
+							<th>Site</th>
+							<th>Mode</th>
+							<th>Item</th>
+							<th>Action</th>
+							<th>Status</th>
+							<th>Message</th>
 						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
+					</thead>
+					<tbody>
+						<?php foreach ( $logs as $log ) : ?>
+							<tr>
+								<td><?php echo esc_html( $this->format_datetime_for_display( isset( $log['created_at'] ) ? $log['created_at'] : '' ) ); ?></td>
+								<td><?php echo esc_html( $log['site_url'] ); ?></td>
+								<td><?php echo esc_html( $log['mode'] ); ?></td>
+								<td><?php echo esc_html( trim( $log['item_type'] . ':' . $log['item_slug'], ':' ) ); ?></td>
+								<td><?php echo esc_html( $log['action'] ); ?></td>
+								<td><?php echo esc_html( $log['status'] ); ?></td>
+								<td><?php echo esc_html( $log['message'] ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
 		</div>
 		<?php
 	}
