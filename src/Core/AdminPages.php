@@ -376,7 +376,7 @@ class AdminPages {
 								<th>Label</th>
 								<th>Current Version</th>
 								<th>Needs Update</th>
-								<th>Action</th>
+								<th class="rawatwp-no-sort">Action</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -486,10 +486,10 @@ class AdminPages {
 								<th class="rawatwp-col-site">Site Name</th>
 								<th class="rawatwp-col-domain">Domain</th>
 								<th class="rawatwp-col-rwp-version">RawatWP Version</th>
-								<th class="rawatwp-col-key">Security Key</th>
+								<th class="rawatwp-col-key rawatwp-no-sort">Security Key</th>
 								<th class="rawatwp-col-status">Status</th>
 								<th class="rawatwp-col-last-seen">Last Seen</th>
-								<th class="rawatwp-col-action">Action</th>
+								<th class="rawatwp-col-action rawatwp-no-sort">Action</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -653,7 +653,7 @@ class AdminPages {
 							<th>Target Slug</th>
 							<th>File</th>
 							<th>Uploaded At</th>
-							<th>Action</th>
+							<th class="rawatwp-no-sort">Action</th>
 						</tr>
 					</thead>
 					<tbody>

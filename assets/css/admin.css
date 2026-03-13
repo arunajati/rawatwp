@@ -81,12 +81,15 @@
 	margin-top: 10px;
 	width: 100%;
 	table-layout: auto;
+	border-collapse: separate;
+	border-spacing: 0;
 }
 
 .rawatwp-admin .widefat thead th {
 	font-weight: 600;
 	position: relative;
 	vertical-align: middle;
+	white-space: nowrap;
 }
 
 .rawatwp-admin .widefat th,
@@ -96,31 +99,45 @@
 	vertical-align: middle;
 }
 
+.rawatwp-admin .widefat td {
+	overflow-wrap: anywhere;
+}
+
 .rawatwp-admin .widefat thead th.rawatwp-sortable {
 	cursor: pointer;
 	user-select: none;
-	padding-right: 22px;
+	padding-right: 18px;
 }
 
 .rawatwp-admin .widefat thead th.rawatwp-sortable::after {
-	content: "\2195";
+	content: "";
 	position: absolute;
-	right: 8px;
+	right: 7px;
 	top: 50%;
-	transform: translateY(-50%);
-	color: #8c8f94;
-	font-size: 11px;
-	line-height: 1;
+	width: 7px;
+	height: 7px;
+	border-right: 1.5px solid #8c8f94;
+	border-bottom: 1.5px solid #8c8f94;
+	transform: translateY(-60%) rotate(45deg);
+	opacity: 0;
+	transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.rawatwp-admin .widefat thead th.rawatwp-sortable:hover::after,
+.rawatwp-admin .widefat thead th.rawatwp-sortable:focus::after {
+	opacity: 0.45;
 }
 
 .rawatwp-admin .widefat thead th.rawatwp-sort-asc::after {
-	content: "\2191";
-	color: #2271b1;
+	opacity: 1;
+	border-color: #2271b1;
+	transform: translateY(-42%) rotate(-135deg);
 }
 
 .rawatwp-admin .widefat thead th.rawatwp-sort-desc::after {
-	content: "\2193";
-	color: #2271b1;
+	opacity: 1;
+	border-color: #2271b1;
+	transform: translateY(-68%) rotate(45deg);
 }
 
 .rawatwp-admin .form-table th {
@@ -168,9 +185,9 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-id {
-	width: 56px;
+	width: 52px;
 	white-space: nowrap;
-	text-align: center;
+	text-align: left;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-site {
@@ -180,8 +197,14 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain {
-	width: 25%;
-	min-width: 220px;
+	width: 27%;
+	min-width: 240px;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain,
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain a {
+	overflow-wrap: anywhere;
+	word-break: break-word;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-rwp-version {
@@ -191,8 +214,8 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-key {
-	width: 9%;
-	min-width: 98px;
+	width: 8%;
+	min-width: 92px;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-status {
@@ -207,7 +230,7 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-action {
-	width: 12%;
+	width: 11%;
 	min-width: 150px;
 	white-space: nowrap;
 }
@@ -580,8 +603,8 @@
 .rawatwp-admin .rawatwp-package-table td.rawatwp-col-check {
 	width: 44px;
 	text-align: center;
-	padding-left: 8px;
-	padding-right: 8px;
+	padding-left: 10px;
+	padding-right: 10px;
 }
 
 .rawatwp-admin .rawatwp-package-table td.rawatwp-col-check input[type="checkbox"],
@@ -589,6 +612,13 @@
 	display: inline-block;
 	margin: 0;
 	vertical-align: middle;
+}
+
+.rawatwp-admin .rawatwp-package-table th:last-child,
+.rawatwp-admin .rawatwp-package-table td:last-child,
+.rawatwp-admin .rawatwp-sites-table th:last-child,
+.rawatwp-admin .rawatwp-sites-table td:last-child {
+	white-space: nowrap;
 }
 
 .rawatwp-admin .rawatwp-select-all-sites {

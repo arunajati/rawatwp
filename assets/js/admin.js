@@ -146,6 +146,15 @@
 			if (!headerText) {
 				return;
 			}
+			var normalizedHeader = headerText.toLowerCase();
+			if (
+				'action' === normalizedHeader ||
+				'security key' === normalizedHeader ||
+				'key' === normalizedHeader
+			) {
+				headerCell.classList.add('rawatwp-no-sort');
+				return;
+			}
 
 			headerCell.classList.add('rawatwp-sortable');
 			headerCell.setAttribute('tabindex', '0');
