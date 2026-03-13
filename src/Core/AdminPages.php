@@ -630,10 +630,10 @@ class AdminPages {
 										/>
 									</td>
 									<td><?php echo esc_html( (string) $package['id'] ); ?></td>
-									<td><?php echo esc_html( $package['label'] ); ?></td>
-									<td><?php echo esc_html( $package['type'] ); ?></td>
+									<td><?php echo esc_html( $this->format_package_label_for_display( $package ) ); ?></td>
+									<td><?php echo esc_html( $this->format_package_type_for_display( isset( $package['type'] ) ? (string) $package['type'] : '' ) ); ?></td>
 									<td><?php echo esc_html( $package['target_slug'] ); ?></td>
-									<td><?php echo esc_html( $package['file_name'] ); ?></td>
+									<td><?php echo esc_html( $this->format_package_file_name_for_display( $package ) ); ?></td>
 									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $package['created_at'] ) ? $package['created_at'] : '' ) ); ?></td>
 									<td>
 										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this package? The zip file and package data will be permanently removed.');">
@@ -683,6 +683,7 @@ class AdminPages {
 								'<span class=\"rawatwp-upload-item-name\"></span>' +
 								'<span class=\"rawatwp-upload-item-status\">Queued</span>' +
 							'</div>' +
+							'<div class=\"rawatwp-upload-item-message\">Waiting in queue.</div>' +
 							'<div class=\"rawatwp-upload-item-bar-wrap\">' +
 								'<div class=\"rawatwp-upload-item-bar\"></div>' +
 							'</div>' +
@@ -702,14 +703,26 @@ class AdminPages {
 						var safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
 						var percentText = safePercent.toFixed(2) + '%';
 						var statusEl = row.querySelector('.rawatwp-upload-item-status');
+						var messageEl = row.querySelector('.rawatwp-upload-item-message');
 						var barEl = row.querySelector('.rawatwp-upload-item-bar');
 						var percentEl = row.querySelector('.rawatwp-upload-item-percent');
+						var stateMap = {
+							queued: 'Queued',
+							uploading: 'Uploading',
+							validating: 'Validating',
+							saving: 'Saving',
+							success: 'Success',
+							failed: 'Failed'
+						};
 
 						row.classList.remove('is-queued', 'is-uploading', 'is-validating', 'is-saving', 'is-success', 'is-failed');
 						row.classList.add('is-' + state);
 
 						if (statusEl) {
-							statusEl.textContent = status;
+							statusEl.textContent = stateMap[state] || 'Queued';
+						}
+						if (messageEl) {
+							messageEl.textContent = status;
 						}
 						if (barEl) {
 							barEl.style.width = percentText;
@@ -1046,7 +1059,7 @@ class AdminPages {
 								<select name="package_id" required>
 									<option value="">Select package</option>
 									<?php foreach ( $packages as $package ) : ?>
-										<option value="<?php echo esc_attr( (string) $package['id'] ); ?>"><?php echo esc_html( $package['label'] . ' [' . $package['type'] . ':' . $package['target_slug'] . ']' ); ?></option>
+										<option value="<?php echo esc_attr( (string) $package['id'] ); ?>"><?php echo esc_html( $this->format_package_label_for_display( $package ) . ' (' . $this->format_package_type_for_display( isset( $package['type'] ) ? (string) $package['type'] : '' ) . ' / ' . $package['target_slug'] . ')' ); ?></option>
 									<?php endforeach; ?>
 								</select>
 							</td>
@@ -1880,6 +1893,75 @@ class AdminPages {
 		}
 
 		$this->render_notices();
+	}
+
+	/**
+	 * Format package label to a readable UI string.
+	 *
+	 * @param array $package Package row.
+	 * @return string
+	 */
+	private function format_package_label_for_display( array $package ) {
+		$label     = isset( $package['label'] ) ? sanitize_text_field( (string) $package['label'] ) : '';
+		$file_name = isset( $package['file_name'] ) ? sanitize_text_field( (string) $package['file_name'] ) : '';
+
+		$is_machine_like = (bool) preg_match( '/^\d{8}[-_]\d{6}[-_]/', $label )
+			|| ( false !== stripos( $label, '.zip.part' ) )
+			|| ( false !== stripos( $label, '.zip' ) );
+
+		$source = $is_machine_like || '' === $label ? $file_name : $label;
+		$source = preg_replace( '/\.part$/i', '', (string) $source );
+		$source = preg_replace( '/\.zip$/i', '', (string) $source );
+		$source = preg_replace( '/^\d{8}[-_]\d{6}[-_]/', '', (string) $source );
+		$source = preg_replace( '/[-_][A-Za-z0-9]{6}$/', '', (string) $source );
+		$source = str_replace( array( '-', '_' ), ' ', (string) $source );
+		$source = preg_replace( '/\s+/', ' ', (string) $source );
+		$source = trim( (string) $source );
+
+		if ( '' === $source ) {
+			return $label;
+		}
+
+		return ucwords( $source );
+	}
+
+	/**
+	 * Format stored file name for UI display.
+	 *
+	 * @param array $package Package row.
+	 * @return string
+	 */
+	private function format_package_file_name_for_display( array $package ) {
+		$file_name = isset( $package['file_name'] ) ? sanitize_text_field( (string) $package['file_name'] ) : '';
+		if ( '' === $file_name ) {
+			return '-';
+		}
+
+		$display = preg_replace( '/^\d{8}[-_]\d{6}[-_]/', '', $file_name );
+		$display = preg_replace( '/[-_][A-Za-z0-9]{6}(\.zip)$/', '$1', (string) $display );
+
+		return '' !== trim( (string) $display ) ? $display : $file_name;
+	}
+
+	/**
+	 * Format package type for user-facing UI.
+	 *
+	 * @param string $type Raw package type.
+	 * @return string
+	 */
+	private function format_package_type_for_display( $type ) {
+		$type = sanitize_key( (string) $type );
+		if ( 'core' === $type ) {
+			return 'WordPress Core';
+		}
+		if ( 'theme' === $type ) {
+			return 'Theme';
+		}
+		if ( 'plugin' === $type ) {
+			return 'Plugin';
+		}
+
+		return ucfirst( $type );
 	}
 
 	/**

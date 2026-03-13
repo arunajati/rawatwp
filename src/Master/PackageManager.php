@@ -90,7 +90,8 @@ class PackageManager {
 			}
 		}
 
-		$detected = $this->detect_package_meta_from_zip( $target_temp_path );
+		$source_file_name = isset( $file['name'] ) ? (string) $file['name'] : '';
+		$detected         = $this->detect_package_meta_from_zip( $target_temp_path, $source_file_name );
 		if ( is_wp_error( $detected ) ) {
 			@unlink( $target_temp_path );
 			return $detected;
@@ -211,7 +212,7 @@ class PackageManager {
 				continue;
 			}
 
-			$detected = $this->detect_package_meta_from_zip( $file_path );
+			$detected = $this->detect_package_meta_from_zip( $file_path, basename( $file_path ) );
 			if ( is_wp_error( $detected ) ) {
 				$error_code = $detected->get_error_code();
 				if ( in_array( $error_code, array( 'rawatwp_unsupported_zip', 'rawatwp_bad_slug' ), true ) ) {
@@ -486,16 +487,17 @@ class PackageManager {
 	 * Detect and validate package metadata by extracting zip to temp folder.
 	 *
 	 * @param string $zip_path zip path.
+	 * @param string $source_name Optional original source file name for better label generation.
 	 * @return array|\WP_Error
 	 */
-	private function detect_package_meta_from_zip( $zip_path ) {
-		$meta = $this->inspect_zip_by_extraction( $zip_path );
+	private function detect_package_meta_from_zip( $zip_path, $source_name = '' ) {
+		$meta = $this->inspect_zip_by_extraction( $zip_path, $source_name );
 		if ( is_wp_error( $meta ) ) {
 			return $meta;
 		}
 
 		$type        = isset( $meta['type'] ) ? sanitize_key( $meta['type'] ) : '';
-		$target_slug = isset( $meta['target_slug'] ) ? sanitize_title( $meta['target_slug'] ) : '';
+		$target_slug = isset( $meta['target_slug'] ) ? sanitize_key( $meta['target_slug'] ) : '';
 		$label       = isset( $meta['label'] ) ? sanitize_text_field( $meta['label'] ) : '';
 
 		if ( ! in_array( $type, array( 'plugin', 'theme', 'core' ), true ) ) {
@@ -511,7 +513,8 @@ class PackageManager {
 		}
 
 		if ( '' === $label ) {
-			$label = sanitize_text_field( wp_basename( $zip_path, '.zip' ) );
+			$fallback_source = '' !== $source_name ? $source_name : wp_basename( $zip_path );
+			$label           = $this->build_human_label_from_source( $fallback_source );
 		}
 
 		$installable_check = $this->validate_installable_structure_from_zip( $zip_path, $type, $target_slug );
@@ -530,9 +533,10 @@ class PackageManager {
 	 * Extract zip into temp folder and infer package metadata from extracted content.
 	 *
 	 * @param string $zip_path zip path.
+	 * @param string $source_name Optional source file name for label generation.
 	 * @return array|\WP_Error
 	 */
-	private function inspect_zip_by_extraction( $zip_path ) {
+	private function inspect_zip_by_extraction( $zip_path, $source_name = '' ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
 			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive is not available on this server.', 'rawatwp' ) );
 		}
@@ -612,7 +616,7 @@ class PackageManager {
 				}
 			}
 
-			return $this->infer_package_meta_from_extracted_dir( $temp_dir, $zip_path );
+			return $this->infer_package_meta_from_extracted_dir( $temp_dir, $zip_path, $source_name );
 		} finally {
 			$zip->close();
 			$this->remove_directory_recursive( $temp_dir );
@@ -624,11 +628,12 @@ class PackageManager {
 	 *
 	 * @param string $extracted_dir Extracted directory.
 	 * @param string $zip_path Source zip path.
+	 * @param string $source_name Optional source file name.
 	 * @return array
 	 */
-	private function infer_package_meta_from_extracted_dir( $extracted_dir, $zip_path ) {
+	private function infer_package_meta_from_extracted_dir( $extracted_dir, $zip_path, $source_name = '' ) {
 		$filename_slug = sanitize_title( wp_basename( $zip_path, '.zip' ) );
-		$label         = sanitize_text_field( str_replace( array( '-', '_' ), ' ', wp_basename( $zip_path, '.zip' ) ) );
+		$label         = $this->build_human_label_from_source( '' !== $source_name ? $source_name : wp_basename( $zip_path ) );
 		if ( '' === $label ) {
 			$label = $filename_slug;
 		}
@@ -719,7 +724,7 @@ class PackageManager {
 		foreach ( $directories as $dir ) {
 			$style = $dir . '/style.css';
 			if ( $this->has_header_marker( $style, 'Theme Name:' ) ) {
-				return sanitize_title( basename( $dir ) );
+				return sanitize_key( basename( $dir ) );
 			}
 		}
 
@@ -749,7 +754,7 @@ class PackageManager {
 
 			foreach ( $php_files as $php_file ) {
 				if ( $this->has_header_marker( $php_file, 'Plugin Name:' ) ) {
-					return sanitize_title( basename( $dir ) );
+					return sanitize_key( basename( $dir ) );
 				}
 			}
 		}
@@ -904,7 +909,7 @@ class PackageManager {
 		}
 
 		$type        = sanitize_key( $type );
-		$target_slug = sanitize_title( $target_slug );
+		$target_slug = sanitize_key( $target_slug );
 
 		$zip = new \ZipArchive();
 		if ( true !== $zip->open( $zip_path ) ) {
@@ -918,6 +923,7 @@ class PackageManager {
 			'wp-includes/version.php',
 		);
 		$core_hits          = 0;
+		$slug_pattern       = preg_quote( $target_slug, '#' );
 
 		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
 			$stat = $zip->statIndex( $index );
@@ -925,7 +931,8 @@ class PackageManager {
 				continue;
 			}
 
-			$name = str_replace( '\\', '/', (string) $stat['name'] );
+			$name       = str_replace( '\\', '/', (string) $stat['name'] );
+			$name_lower = strtolower( $name );
 
 			if ( 'plugin' === $type || 'theme' === $type ) {
 				$prefixes = array(
@@ -937,10 +944,21 @@ class PackageManager {
 					'wordpress/wp-content/themes/' . $target_slug . '/',
 				);
 				foreach ( $prefixes as $prefix ) {
-					if ( 0 === strpos( $name, $prefix ) ) {
+					$prefix = strtolower( $prefix );
+					if ( 0 === strpos( $name_lower, $prefix ) ) {
 						$has_expected_entry = true;
 						break 2;
 					}
+				}
+
+				if ( 'theme' === $type && preg_match( '#(^|/)' . $slug_pattern . '/style\.css$#i', $name ) ) {
+					$has_expected_entry = true;
+					break;
+				}
+
+				if ( 'plugin' === $type && preg_match( '#(^|/)' . $slug_pattern . '/[^/]+\.php$#i', $name ) ) {
+					$has_expected_entry = true;
+					break;
 				}
 			}
 
@@ -978,5 +996,28 @@ class PackageManager {
 		}
 
 		return new \WP_Error( 'rawatwp_zip_not_installable', __( 'Zip is not installable by WordPress.', 'rawatwp' ) );
+	}
+
+	/**
+	 * Build a readable package label from source zip filename.
+	 *
+	 * @param string $source_name Source file name.
+	 * @return string
+	 */
+	private function build_human_label_from_source( $source_name ) {
+		$source_name = wp_basename( wp_normalize_path( (string) $source_name ) );
+		$source_name = preg_replace( '/\.part$/i', '', $source_name );
+		$source_name = preg_replace( '/\.zip$/i', '', $source_name );
+		$source_name = preg_replace( '/^\d{8}-\d{6}-/', '', $source_name );
+		$source_name = preg_replace( '/-[A-Za-z0-9]{6}$/', '', $source_name );
+		$source_name = str_replace( array( '-', '_' ), ' ', $source_name );
+		$source_name = preg_replace( '/\s+/', ' ', (string) $source_name );
+		$source_name = trim( (string) $source_name );
+
+		if ( '' === $source_name ) {
+			return '';
+		}
+
+		return sanitize_text_field( ucwords( $source_name ) );
 	}
 }
