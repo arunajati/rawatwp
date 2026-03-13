@@ -435,12 +435,27 @@ class GitHubUpdater {
 			$repo,
 			time()
 		);
-		$release    = $this->fetch_single_release_from_url( $latest_url, $args );
-		if ( is_wp_error( $release ) ) {
-			$release = $this->fetch_best_release_from_list( $owner, $repo, $args );
-			if ( is_wp_error( $release ) ) {
-				return $release;
+		$latest_release = $this->fetch_single_release_from_url( $latest_url, $args );
+		$list_release   = $this->fetch_best_release_from_list( $owner, $repo, $args );
+
+		$release = null;
+		if ( ! is_wp_error( $latest_release ) && ! is_wp_error( $list_release ) ) {
+			$release = version_compare( $list_release['version'], $latest_release['version'], '>' ) ? $list_release : $latest_release;
+		} elseif ( ! is_wp_error( $latest_release ) ) {
+			$release = $latest_release;
+		} elseif ( ! is_wp_error( $list_release ) ) {
+			$release = $list_release;
+		}
+
+		if ( ! is_array( $release ) ) {
+			if ( is_wp_error( $list_release ) ) {
+				return $list_release;
 			}
+			if ( is_wp_error( $latest_release ) ) {
+				return $latest_release;
+			}
+
+			return new \WP_Error( 'rawatwp_gh_bad_response', 'Release data cannot be read. Check connection or source access.' );
 		}
 
 		set_transient( $cache_key, $release, DAY_IN_SECONDS );
