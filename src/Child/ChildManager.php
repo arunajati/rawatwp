@@ -339,7 +339,7 @@ class ChildManager {
 		$data = isset( $packet['data'] ) && is_array( $packet['data'] ) ? $packet['data'] : array();
 
 		$target_type = isset( $data['package_type'] ) ? sanitize_key( $data['package_type'] ) : '';
-		$target_slug = isset( $data['target_slug'] ) ? sanitize_title( $data['target_slug'] ) : '';
+		$target_slug = isset( $data['target_slug'] ) ? sanitize_key( $data['target_slug'] ) : '';
 		if ( 'core' === $target_type && '' === $target_slug ) {
 			$target_slug = 'wordpress-core';
 		}
@@ -351,7 +351,7 @@ class ChildManager {
 				$item = array(
 					'id'              => '',
 					'type'            => $target_type,
-					'slug'            => '' !== $target_slug ? $target_slug : sanitize_title( (string) ( $data['package_label'] ?? 'package' ) ),
+					'slug'            => '' !== $target_slug ? $target_slug : sanitize_key( (string) ( $data['package_label'] ?? 'package' ) ),
 					'label'           => isset( $data['package_label'] ) ? sanitize_text_field( $data['package_label'] ) : $target_slug,
 					'current_version' => '',
 					'needs_update'    => true,

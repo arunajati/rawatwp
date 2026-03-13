@@ -3,7 +3,7 @@
  * Plugin Name: RawatWP
  * Plugin URI: https://arunajr.com
  * Description: Master-child updater orchestration plugin with secure push, backup, rollback, and logging.
- * Version: 0.1.40
+ * Version: 0.1.41
  * Author: arunajr.com
  * Text Domain: rawatwp
  */
@@ -30,7 +30,7 @@ if ( 'rawatwp/rawatwp.php' !== plugin_basename( __FILE__ ) ) {
 	return;
 }
 
-define( 'RAWATWP_VERSION', '0.1.40' );
+define( 'RAWATWP_VERSION', '0.1.41' );
 define( 'RAWATWP_FILE', __FILE__ );
 define( 'RAWATWP_DIR', plugin_dir_path( __FILE__ ) );
 define( 'RAWATWP_URL', plugin_dir_url( __FILE__ ) );

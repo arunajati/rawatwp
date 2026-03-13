@@ -502,17 +502,25 @@ class UpdateEngine {
 	 */
 	private function resolve_target_path( array $item ) {
 		$type = sanitize_key( $item['type'] );
-		$slug = sanitize_title( $item['slug'] );
+		$slug = sanitize_key( $item['slug'] );
 
 		if ( '' === $slug ) {
 			return new \WP_Error( 'rawatwp_bad_target_slug', __( 'Invalid target slug.', 'rawatwp' ) );
 		}
 
 		if ( 'plugin' === $type ) {
+			$resolved = $this->resolve_case_insensitive_child_dir( WP_PLUGIN_DIR, $slug );
+			if ( '' !== $resolved ) {
+				return $resolved;
+			}
 			return wp_normalize_path( WP_PLUGIN_DIR . '/' . $slug );
 		}
 
 		if ( 'theme' === $type ) {
+			$resolved = $this->resolve_case_insensitive_child_dir( get_theme_root(), $slug );
+			if ( '' !== $resolved ) {
+				return $resolved;
+			}
 			return wp_normalize_path( get_theme_root() . '/' . $slug );
 		}
 
@@ -572,7 +580,7 @@ class UpdateEngine {
 	 */
 	private function resolve_source_root( $extract_dir, $target_slug, $target_type ) {
 		$extract_dir = wp_normalize_path( $extract_dir );
-		$target_slug = sanitize_title( $target_slug );
+		$target_slug = sanitize_key( $target_slug );
 		$target_type = sanitize_key( $target_type );
 
 		$candidates = array(
@@ -607,6 +615,11 @@ class UpdateEngine {
 			if ( is_dir( $candidate ) ) {
 				return $candidate;
 			}
+
+			$resolved = $this->resolve_case_insensitive_child_dir( dirname( $candidate ), basename( $candidate ) );
+			if ( '' !== $resolved && is_dir( $resolved ) ) {
+				return $resolved;
+			}
 		}
 
 		$entries     = array_values(
@@ -634,7 +647,7 @@ class UpdateEngine {
 			}
 		}
 
-		return $extract_dir;
+		return new \WP_Error( 'rawatwp_source_root_not_found', __( 'Unable to detect package root for this target slug.', 'rawatwp' ) );
 	}
 
 	/**
@@ -650,7 +663,7 @@ class UpdateEngine {
 		}
 
 		$type = isset( $item['type'] ) ? sanitize_key( $item['type'] ) : '';
-		$slug = isset( $item['slug'] ) ? sanitize_title( $item['slug'] ) : '';
+		$slug = isset( $item['slug'] ) ? sanitize_key( $item['slug'] ) : '';
 		if ( '' === $type || '' === $slug ) {
 			return false;
 		}
@@ -676,9 +689,9 @@ class UpdateEngine {
 				continue;
 			}
 
-			$name = str_replace( '\\', '/', (string) $stat['name'] );
+			$name = strtolower( str_replace( '\\', '/', (string) $stat['name'] ) );
 			foreach ( $prefixes as $prefix ) {
-				if ( 0 === strpos( $name, $prefix ) ) {
+				if ( 0 === strpos( $name, strtolower( $prefix ) ) ) {
 					$allowed = true;
 					break 2;
 				}
@@ -691,15 +704,55 @@ class UpdateEngine {
 			return false;
 		}
 
-		if ( 'plugin' === $type && ! is_dir( WP_PLUGIN_DIR . '/' . $slug ) ) {
+		if ( 'plugin' === $type && '' === $this->resolve_case_insensitive_child_dir( WP_PLUGIN_DIR, $slug ) ) {
 			return false;
 		}
 
-		if ( 'theme' === $type && ! is_dir( get_theme_root() . '/' . $slug ) ) {
+		if ( 'theme' === $type && '' === $this->resolve_case_insensitive_child_dir( get_theme_root(), $slug ) ) {
 			return false;
 		}
 
 		return true;
+	}
+
+	/**
+	 * Resolve child directory path by slug with case-insensitive fallback.
+	 *
+	 * @param string $base_dir Base directory.
+	 * @param string $slug Directory slug.
+	 * @return string
+	 */
+	private function resolve_case_insensitive_child_dir( $base_dir, $slug ) {
+		$base_dir = wp_normalize_path( (string) $base_dir );
+		$slug     = sanitize_key( (string) $slug );
+		if ( '' === $base_dir || '' === $slug || ! is_dir( $base_dir ) ) {
+			return '';
+		}
+
+		$exact = wp_normalize_path( $base_dir . '/' . $slug );
+		if ( is_dir( $exact ) ) {
+			return $exact;
+		}
+
+		$entries = scandir( $base_dir );
+		if ( false === $entries ) {
+			return '';
+		}
+
+		foreach ( $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
+				continue;
+			}
+			$candidate = wp_normalize_path( $base_dir . '/' . $entry );
+			if ( ! is_dir( $candidate ) ) {
+				continue;
+			}
+			if ( sanitize_key( $entry ) === $slug ) {
+				return $candidate;
+			}
+		}
+
+		return '';
 	}
 
 	/**

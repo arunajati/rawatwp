@@ -74,15 +74,8 @@ class PackageManager {
 			}
 		}
 
-		$target_file_name = sprintf(
-			'%s-%s-%s.zip',
-			gmdate( 'Ymd-His' ),
-			sanitize_file_name( wp_basename( $file['name'], '.zip' ) ),
-			wp_generate_password( 6, false, false )
-		);
-
-		$target_path      = trailingslashit( $packages_dir ) . $target_file_name;
-		$target_temp_path = $target_path . '.part';
+		$source_file_name = isset( $file['name'] ) ? (string) $file['name'] : '';
+		$target_temp_path = trailingslashit( $packages_dir ) . 'incoming-' . wp_generate_uuid4() . '.zip.part';
 
 		if ( ! @move_uploaded_file( $file['tmp_name'], $target_temp_path ) ) {
 			if ( ! @copy( $file['tmp_name'], $target_temp_path ) ) {
@@ -90,27 +83,62 @@ class PackageManager {
 			}
 		}
 
-		$source_file_name = isset( $file['name'] ) ? (string) $file['name'] : '';
-		$detected         = $this->detect_package_meta_from_zip( $target_temp_path, $source_file_name );
-		if ( is_wp_error( $detected ) ) {
+		$prepared = $this->prepare_zip_for_registration( $target_temp_path, $source_file_name, true );
+		if ( is_wp_error( $prepared ) ) {
 			@unlink( $target_temp_path );
-			return $detected;
+			return $prepared;
 		}
+
+		$working_zip_path   = isset( $prepared['zip_path'] ) ? wp_normalize_path( (string) $prepared['zip_path'] ) : $target_temp_path;
+		$detected           = isset( $prepared['meta'] ) && is_array( $prepared['meta'] ) ? $prepared['meta'] : array();
+		$from_bundle        = ! empty( $prepared['from_bundle'] );
+		$resolved_file_name = isset( $prepared['source_name'] ) ? (string) $prepared['source_name'] : $source_file_name;
 
 		$type        = $detected['type'];
 		$target_slug = $detected['target_slug'];
 		$label       = $detected['label'];
 
-		$hash       = hash_file( 'sha256', $target_temp_path );
+		$hash       = hash_file( 'sha256', $working_zip_path );
+		if ( ! is_string( $hash ) || '' === $hash ) {
+			if ( $working_zip_path !== $target_temp_path ) {
+				@unlink( $working_zip_path );
+			}
+			@unlink( $target_temp_path );
+			return new \WP_Error( 'rawatwp_hash_failed', __( 'Failed to calculate package hash.', 'rawatwp' ) );
+		}
+
 		$existing   = $this->database->get_package_by_hash( $hash );
 		if ( $existing ) {
+			if ( $working_zip_path !== $target_temp_path ) {
+				@unlink( $working_zip_path );
+			}
 			@unlink( $target_temp_path );
 			return new \WP_Error( 'rawatwp_package_duplicate', __( 'This zip file is already registered.', 'rawatwp' ) );
 		}
 
-		if ( ! @rename( $target_temp_path, $target_path ) ) {
+		$target_file_name = sprintf(
+			'%s-%s-%s.zip',
+			gmdate( 'Ymd-His' ),
+			sanitize_file_name( wp_basename( $resolved_file_name, '.zip' ) ),
+			wp_generate_password( 6, false, false )
+		);
+		$target_path      = trailingslashit( $packages_dir ) . $target_file_name;
+
+		if ( ! @rename( $working_zip_path, $target_path ) ) {
+			if ( ! @copy( $working_zip_path, $target_path ) ) {
+				if ( $working_zip_path !== $target_temp_path ) {
+					@unlink( $working_zip_path );
+				}
+				@unlink( $target_temp_path );
+				return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to finalize uploaded file.', 'rawatwp' ) );
+			}
+			if ( $working_zip_path !== $target_temp_path ) {
+				@unlink( $working_zip_path );
+			}
+		}
+
+		if ( $working_zip_path !== $target_temp_path ) {
 			@unlink( $target_temp_path );
-			return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to finalize uploaded file.', 'rawatwp' ) );
 		}
 
 		$package_id = $this->database->insert_package(
@@ -140,6 +168,7 @@ class PackageManager {
 				'context'   => array(
 					'package_id' => $package_id,
 					'file_name'  => $target_file_name,
+					'from_bundle' => $from_bundle,
 				),
 			)
 		);
@@ -190,8 +219,37 @@ class PackageManager {
 				continue;
 			}
 
-			$file_hash = hash_file( 'sha256', $file_path );
+			$prepared = $this->prepare_zip_for_registration( $file_path, basename( $file_path ), true );
+			if ( is_wp_error( $prepared ) ) {
+				$error_code = $prepared->get_error_code();
+				if ( in_array( $error_code, array( 'rawatwp_unsupported_zip', 'rawatwp_bad_slug' ), true ) ) {
+					$result['skipped']++;
+					$result['details'][] = array(
+						'file'   => basename( $file_path ),
+						'status' => 'skipped',
+						'reason' => $prepared->get_error_message(),
+					);
+				} else {
+					$result['failed']++;
+					$result['details'][] = array(
+						'file'   => basename( $file_path ),
+						'status' => 'failed',
+						'reason' => $prepared->get_error_message(),
+					);
+				}
+				continue;
+			}
+
+			$detected         = isset( $prepared['meta'] ) && is_array( $prepared['meta'] ) ? $prepared['meta'] : array();
+			$working_zip_path = isset( $prepared['zip_path'] ) ? wp_normalize_path( (string) $prepared['zip_path'] ) : $file_path;
+			$from_bundle      = ! empty( $prepared['from_bundle'] );
+			$source_name      = isset( $prepared['source_name'] ) ? (string) $prepared['source_name'] : basename( $file_path );
+
+			$file_hash = hash_file( 'sha256', $working_zip_path );
 			if ( ! is_string( $file_hash ) || '' === $file_hash ) {
+				if ( $working_zip_path !== $file_path ) {
+					@unlink( $working_zip_path );
+				}
 				$result['failed']++;
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
@@ -203,6 +261,9 @@ class PackageManager {
 
 			$existing = $this->database->get_package_by_hash( $file_hash );
 			if ( $existing ) {
+				if ( $working_zip_path !== $file_path ) {
+					@unlink( $working_zip_path );
+				}
 				$result['skipped']++;
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
@@ -212,25 +273,25 @@ class PackageManager {
 				continue;
 			}
 
-			$detected = $this->detect_package_meta_from_zip( $file_path, basename( $file_path ) );
-			if ( is_wp_error( $detected ) ) {
-				$error_code = $detected->get_error_code();
-				if ( in_array( $error_code, array( 'rawatwp_unsupported_zip', 'rawatwp_bad_slug' ), true ) ) {
-					$result['skipped']++;
-					$result['details'][] = array(
-						'file'   => basename( $file_path ),
-						'status' => 'skipped',
-						'reason' => $detected->get_error_message(),
-					);
-				} else {
-					$result['failed']++;
-					$result['details'][] = array(
-						'file'   => basename( $file_path ),
-						'status' => 'failed',
-						'reason' => $detected->get_error_message(),
-					);
+			$store_path = $file_path;
+			$store_name = basename( $file_path );
+			if ( $working_zip_path !== $file_path ) {
+				$store_name = $this->build_scan_import_file_name( $source_name, $file_hash );
+				$store_path = trailingslashit( $packages_dir ) . $store_name;
+
+				if ( ! @rename( $working_zip_path, $store_path ) ) {
+					if ( ! @copy( $working_zip_path, $store_path ) ) {
+						@unlink( $working_zip_path );
+						$result['failed']++;
+						$result['details'][] = array(
+							'file'   => basename( $file_path ),
+							'status' => 'failed',
+							'reason' => 'Failed to save installable package extracted from bundle.',
+						);
+						continue;
+					}
+					@unlink( $working_zip_path );
 				}
-				continue;
 			}
 
 			$inserted_id = $this->database->insert_package(
@@ -238,13 +299,16 @@ class PackageManager {
 					'label'       => $detected['label'],
 					'type'        => $detected['type'],
 					'target_slug' => $detected['target_slug'],
-					'file_name'   => basename( $file_path ),
-					'file_path'   => $file_path,
+					'file_name'   => $store_name,
+					'file_path'   => $store_path,
 					'file_hash'   => $file_hash,
 				)
 			);
 
 			if ( false === $inserted_id ) {
+				if ( $working_zip_path !== $file_path ) {
+					@unlink( $store_path );
+				}
 				$result['failed']++;
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
@@ -260,6 +324,7 @@ class PackageManager {
 				'status'      => 'imported',
 				'type'        => $detected['type'],
 				'target_slug' => $detected['target_slug'],
+				'from_bundle' => $from_bundle,
 			);
 
 			$this->logger->log(
@@ -269,9 +334,10 @@ class PackageManager {
 					'status'    => 'success',
 					'item_type' => $detected['type'],
 					'item_slug' => $detected['target_slug'],
-					'message'   => sprintf( 'Package imported from updates folder: %s', basename( $file_path ) ),
+					'message'   => sprintf( 'Package imported from updates folder: %s', $store_name ),
 					'context'   => array(
-						'file_path' => $file_path,
+						'file_path'   => $store_path,
+						'from_bundle' => $from_bundle,
 					),
 				)
 			);
@@ -484,6 +550,270 @@ class PackageManager {
 	}
 
 	/**
+	 * Prepare uploaded/scanned zip into an installable package zip + metadata.
+	 *
+	 * @param string $zip_path Zip path.
+	 * @param string $source_name Source file name.
+	 * @param bool   $allow_nested Whether nested zip fallback is allowed.
+	 * @return array|\WP_Error
+	 */
+	private function prepare_zip_for_registration( $zip_path, $source_name, $allow_nested = true ) {
+		$zip_path    = wp_normalize_path( (string) $zip_path );
+		$source_name = (string) $source_name;
+		$direct      = $this->detect_package_meta_from_zip( $zip_path, $source_name );
+		if ( ! is_wp_error( $direct ) ) {
+			return array(
+				'zip_path'    => $zip_path,
+				'meta'        => $direct,
+				'source_name' => $source_name,
+				'from_bundle' => false,
+			);
+		}
+
+		if ( ! $allow_nested || ! $this->is_nested_detection_fallback_allowed( $direct->get_error_code() ) ) {
+			return $direct;
+		}
+
+		$nested = $this->extract_installable_nested_zip_from_bundle( $zip_path, $source_name );
+		if ( is_wp_error( $nested ) ) {
+			return $nested;
+		}
+
+		return array(
+			'zip_path'    => $nested['zip_path'],
+			'meta'        => $nested['meta'],
+			'source_name' => $nested['source_name'],
+			'from_bundle' => true,
+		);
+	}
+
+	/**
+	 * Determine whether error code can fallback to nested zip detection.
+	 *
+	 * @param string $error_code Error code.
+	 * @return bool
+	 */
+	private function is_nested_detection_fallback_allowed( $error_code ) {
+		return in_array(
+			sanitize_key( (string) $error_code ),
+			array(
+				'rawatwp_unsupported_zip',
+				'rawatwp_bad_slug',
+				'rawatwp_zip_not_installable',
+			),
+			true
+		);
+	}
+
+	/**
+	 * Extract one installable nested zip from a bundle package.
+	 *
+	 * @param string $outer_zip_path Bundle zip path.
+	 * @param string $source_name Original source file name.
+	 * @return array|\WP_Error
+	 */
+	private function extract_installable_nested_zip_from_bundle( $outer_zip_path, $source_name ) {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive is not available on this server.', 'rawatwp' ) );
+		}
+
+		$zip = new \ZipArchive();
+		if ( true !== $zip->open( $outer_zip_path ) ) {
+			return new \WP_Error( 'rawatwp_zip_open_failed', __( 'Zip cannot be opened.', 'rawatwp' ) );
+		}
+
+		$candidates = array();
+		$temp_files = array();
+
+		try {
+			for ( $index = 0; $index < $zip->numFiles; $index++ ) {
+				$stat = $zip->statIndex( $index );
+				if ( ! $stat || empty( $stat['name'] ) ) {
+					continue;
+				}
+
+				$entry_name = str_replace( '\\', '/', (string) $stat['name'] );
+				if ( '/' === substr( $entry_name, -1 ) ) {
+					continue;
+				}
+
+				if ( '.zip' !== strtolower( pathinfo( $entry_name, PATHINFO_EXTENSION ) ) ) {
+					continue;
+				}
+
+				if ( ! $this->is_safe_zip_entry( trim( $entry_name, '/' ) ) ) {
+					continue;
+				}
+
+				if ( 0 === strpos( strtolower( $entry_name ), '__macosx/' ) ) {
+					continue;
+				}
+
+				$temp_zip = $this->extract_zip_entry_to_temp_file( $zip, $entry_name );
+				if ( is_wp_error( $temp_zip ) ) {
+					continue;
+				}
+
+				$temp_files[] = $temp_zip;
+				$meta         = $this->detect_package_meta_from_zip( $temp_zip, basename( $entry_name ) );
+				if ( is_wp_error( $meta ) ) {
+					continue;
+				}
+
+				$candidates[] = array(
+					'zip_path'    => $temp_zip,
+					'meta'        => $meta,
+					'source_name' => basename( $entry_name ),
+					'score'       => $this->score_nested_candidate( basename( $source_name ), basename( $entry_name ), $meta ),
+				);
+			}
+		} finally {
+			$zip->close();
+		}
+
+		if ( empty( $candidates ) ) {
+			foreach ( $temp_files as $temp_file ) {
+				@unlink( $temp_file );
+			}
+			return new \WP_Error(
+				'rawatwp_nested_installable_not_found',
+				__( 'No installable plugin/theme/core zip was found inside this file. If this is a marketplace bundle, upload the installable zip file only.', 'rawatwp' )
+			);
+		}
+
+		usort(
+			$candidates,
+			static function( $a, $b ) {
+				return (int) $b['score'] <=> (int) $a['score'];
+			}
+		);
+
+		$chosen = $candidates[0];
+		if ( count( $candidates ) > 1 ) {
+			$top_score    = (int) $candidates[0]['score'];
+			$second_score = (int) $candidates[1]['score'];
+			if ( $top_score === $second_score ) {
+				foreach ( $temp_files as $temp_file ) {
+					@unlink( $temp_file );
+				}
+
+				return new \WP_Error(
+					'rawatwp_nested_multiple_installable',
+					__( 'This zip contains multiple installable packages. Upload the specific installable zip file you want to deploy.', 'rawatwp' )
+				);
+			}
+		}
+
+		foreach ( $temp_files as $temp_file ) {
+			if ( $temp_file !== $chosen['zip_path'] ) {
+				@unlink( $temp_file );
+			}
+		}
+
+		return $chosen;
+	}
+
+	/**
+	 * Score nested zip candidate selection.
+	 *
+	 * @param string $outer_name Outer zip name.
+	 * @param string $entry_name Nested entry name.
+	 * @param array  $meta Detected metadata.
+	 * @return int
+	 */
+	private function score_nested_candidate( $outer_name, $entry_name, array $meta ) {
+		$outer_slug  = sanitize_key( wp_basename( (string) $outer_name, '.zip' ) );
+		$entry_slug  = sanitize_key( wp_basename( (string) $entry_name, '.zip' ) );
+		$target_slug = isset( $meta['target_slug'] ) ? sanitize_key( $meta['target_slug'] ) : '';
+		$type        = isset( $meta['type'] ) ? sanitize_key( $meta['type'] ) : '';
+		$score       = 0;
+
+		if ( '' !== $target_slug && false !== strpos( $outer_slug, $target_slug ) ) {
+			$score += 50;
+		}
+
+		if ( '' !== $target_slug && false !== strpos( $entry_slug, $target_slug ) ) {
+			$score += 45;
+		}
+
+		if ( 'theme' === $type ) {
+			$score += 10;
+		}
+
+		if ( 'plugin' === $type ) {
+			$score += 5;
+		}
+
+		if ( 'avada' === $target_slug ) {
+			$score += 20;
+		}
+
+		if ( 'avada' === $entry_slug ) {
+			$score += 25;
+		}
+
+		return $score;
+	}
+
+	/**
+	 * Extract zip entry stream to a temp file.
+	 *
+	 * @param \ZipArchive $zip Zip archive.
+	 * @param string      $entry_name Entry name.
+	 * @return string|\WP_Error
+	 */
+	private function extract_zip_entry_to_temp_file( \ZipArchive $zip, $entry_name ) {
+		$stream = $zip->getStream( $entry_name );
+		if ( ! is_resource( $stream ) ) {
+			return new \WP_Error( 'rawatwp_nested_extract_failed', __( 'Failed to read nested zip from bundle.', 'rawatwp' ) );
+		}
+
+		$temp_zip = wp_tempnam( 'rawatwp-nested-package.zip' );
+		if ( ! is_string( $temp_zip ) || '' === $temp_zip ) {
+			fclose( $stream );
+			return new \WP_Error( 'rawatwp_temp_file_failed', __( 'Failed to create temp file for nested package.', 'rawatwp' ) );
+		}
+
+		$out = fopen( $temp_zip, 'wb' );
+		if ( false === $out ) {
+			fclose( $stream );
+			@unlink( $temp_zip );
+			return new \WP_Error( 'rawatwp_temp_file_failed', __( 'Failed to write nested package temp file.', 'rawatwp' ) );
+		}
+
+		$copied = stream_copy_to_stream( $stream, $out );
+		fclose( $stream );
+		fclose( $out );
+
+		if ( false === $copied ) {
+			@unlink( $temp_zip );
+			return new \WP_Error( 'rawatwp_nested_extract_failed', __( 'Failed to extract nested package zip.', 'rawatwp' ) );
+		}
+
+		return wp_normalize_path( $temp_zip );
+	}
+
+	/**
+	 * Build file name for zip imported from folder scan.
+	 *
+	 * @param string $source_name Source file name.
+	 * @param string $hash File hash.
+	 * @return string
+	 */
+	private function build_scan_import_file_name( $source_name, $hash ) {
+		$source_name = sanitize_file_name( wp_basename( (string) $source_name, '.zip' ) );
+		$hash_short  = substr( sanitize_key( (string) $hash ), 0, 12 );
+		if ( '' === $source_name ) {
+			$source_name = 'package';
+		}
+		if ( '' === $hash_short ) {
+			$hash_short = wp_generate_password( 8, false, false );
+		}
+
+		return sprintf( 'detected-%s-%s.zip', $hash_short, $source_name );
+	}
+
+	/**
 	 * Detect and validate package metadata by extracting zip to temp folder.
 	 *
 	 * @param string $zip_path zip path.
@@ -665,6 +995,24 @@ class PackageManager {
 			);
 		}
 
+		$theme_patch_slug = $this->detect_content_path_slug( $extracted_dir, 'theme' );
+		if ( '' !== $theme_patch_slug ) {
+			return array(
+				'type'        => 'theme',
+				'target_slug' => $theme_patch_slug,
+				'label'       => $label,
+			);
+		}
+
+		$plugin_patch_slug = $this->detect_content_path_slug( $extracted_dir, 'plugin' );
+		if ( '' !== $plugin_patch_slug ) {
+			return array(
+				'type'        => 'plugin',
+				'target_slug' => $plugin_patch_slug,
+				'label'       => $label,
+			);
+		}
+
 		if ( preg_match( '/(^|[^a-z0-9])wordpress-[0-9]/i', wp_basename( $zip_path, '.zip' ) ) ) {
 			return array(
 				'type'        => 'core',
@@ -699,6 +1047,45 @@ class PackageManager {
 				&& is_file( $candidate . '/wp-admin/includes/update-core.php' ) ) {
 				return $candidate;
 			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Detect target slug from wp-content based patch structure.
+	 *
+	 * @param string $extracted_dir Extracted directory.
+	 * @param string $type Target type (plugin/theme).
+	 * @return string
+	 */
+	private function detect_content_path_slug( $extracted_dir, $type ) {
+		$type        = sanitize_key( $type );
+		$content_dir = 'theme' === $type ? 'wp-content/themes' : 'wp-content/plugins';
+		$base_dirs   = array_merge(
+			array( wp_normalize_path( $extracted_dir ) ),
+			$this->get_immediate_directories( $extracted_dir )
+		);
+		$found_slugs = array();
+
+		foreach ( $base_dirs as $base_dir ) {
+			$scan_dir = wp_normalize_path( trailingslashit( $base_dir ) . $content_dir );
+			if ( ! is_dir( $scan_dir ) ) {
+				continue;
+			}
+
+			$children = $this->get_immediate_directories( $scan_dir );
+			foreach ( $children as $child_dir ) {
+				$slug = sanitize_key( basename( $child_dir ) );
+				if ( '' !== $slug ) {
+					$found_slugs[ $slug ] = true;
+				}
+			}
+		}
+
+		if ( 1 === count( $found_slugs ) ) {
+			$keys = array_keys( $found_slugs );
+			return (string) $keys[0];
 		}
 
 		return '';
@@ -949,6 +1336,16 @@ class PackageManager {
 						$has_expected_entry = true;
 						break 2;
 					}
+				}
+
+				if ( 'theme' === $type && preg_match( '#(^|/)wp-content/themes/' . $slug_pattern . '/#i', $name ) ) {
+					$has_expected_entry = true;
+					break;
+				}
+
+				if ( 'plugin' === $type && preg_match( '#(^|/)wp-content/plugins/' . $slug_pattern . '/#i', $name ) ) {
+					$has_expected_entry = true;
+					break;
 				}
 
 				if ( 'theme' === $type && preg_match( '#(^|/)' . $slug_pattern . '/style\.css$#i', $name ) ) {
