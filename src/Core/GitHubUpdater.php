@@ -302,7 +302,7 @@ class GitHubUpdater {
 
 		$moved = $wp_filesystem->move( $source, $normalized_target, true );
 		if ( ! $moved ) {
-			return new \WP_Error( 'rawatwp_update_move_failed', __( 'Gagal menyiapkan folder update RawatWP.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_update_move_failed', __( 'Failed to prepare RawatWP update folder.', 'rawatwp' ) );
 		}
 
 		return $normalized_target;
@@ -377,24 +377,24 @@ class GitHubUpdater {
 
 		$response = wp_remote_get( $url, $args );
 		if ( is_wp_error( $response ) ) {
-			return new \WP_Error( 'rawatwp_gh_request_failed', 'Gagal koneksi ke server update: ' . $response->get_error_message() );
+			return new \WP_Error( 'rawatwp_gh_request_failed', 'Failed to connect to update server: ' . $response->get_error_message() );
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 		if ( $code < 200 || $code >= 300 || ! is_array( $body ) ) {
-			return new \WP_Error( 'rawatwp_gh_bad_response', 'Data release tidak bisa dibaca. Cek koneksi atau akses sumber update.' );
+			return new \WP_Error( 'rawatwp_gh_bad_response', 'Release data cannot be read. Check connection or source access.' );
 		}
 
 		$tag = isset( $body['tag_name'] ) ? sanitize_text_field( (string) $body['tag_name'] ) : '';
 		if ( '' === $tag ) {
-			return new \WP_Error( 'rawatwp_gh_no_tag', 'Release tidak memiliki tag versi.' );
+			return new \WP_Error( 'rawatwp_gh_no_tag', 'Release has no version tag.' );
 		}
 
 		$version     = ltrim( $tag, "vV \t\n\r\0\x0B" );
 		$package_url = $this->pick_release_asset_url( $body );
 		if ( '' === $package_url ) {
-			return new \WP_Error( 'rawatwp_gh_no_asset', 'Release wajib punya asset zip installable, misalnya rawatwp-0.1.19.zip.' );
+			return new \WP_Error( 'rawatwp_gh_no_asset', 'Release must include an installable zip asset, for example rawatwp-0.1.19.zip.' );
 		}
 
 		$release = array(

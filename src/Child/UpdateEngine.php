@@ -68,13 +68,13 @@ class UpdateEngine {
 					'item_slug' => $item['slug'],
 					'action'    => 'update_failed',
 					'status'    => 'update_failed',
-					'message'   => 'URL download package kosong.',
+					'message'   => 'Package download URL is empty.',
 				)
 			);
 
 			return array(
 				'status'  => 'update_failed',
-				'message' => 'URL download package kosong.',
+				'message' => 'Package download URL is empty.',
 				'events'  => array(),
 			);
 		}
@@ -104,7 +104,7 @@ class UpdateEngine {
 		}
 
 		$events = array();
-		$events[] = $this->build_event( $item, 'update_started', 'update_started', 'Update dimulai.' );
+		$events[] = $this->build_event( $item, 'update_started', 'update_started', 'Update started.' );
 
 		$this->logger->log(
 			array(
@@ -113,7 +113,7 @@ class UpdateEngine {
 				'item_slug' => $item['slug'],
 				'action'    => 'update_started',
 				'status'    => 'update_started',
-				'message'   => 'Update dimulai.',
+				'message'   => 'Update started.',
 			)
 		);
 
@@ -182,7 +182,7 @@ class UpdateEngine {
 			);
 		}
 
-		$wp_native_result = new \WP_Error( 'rawatwp_native_skipped', 'WP-native dilewati, fallback dijalankan.' );
+		$wp_native_result = new \WP_Error( 'rawatwp_native_skipped', 'WP-native was skipped, fallback is running.' );
 		if ( in_array( $item['type'], array( 'plugin', 'theme' ), true ) ) {
 			if ( $this->can_use_wp_native( $tmp_zip, $item ) ) {
 				try {
@@ -196,7 +196,7 @@ class UpdateEngine {
 			} else {
 				$wp_native_result = new \WP_Error(
 					'rawatwp_native_mismatch',
-					'Struktur zip tidak cocok untuk update native, fallback dijalankan agar update tetap ke slug target.'
+					'Zip structure does not match native update, fallback is running to keep update on target slug.'
 				);
 			}
 		}
@@ -219,14 +219,14 @@ class UpdateEngine {
 			$health = $this->health_checker->run( $target_path );
 			if ( empty( $health['ok'] ) ) {
 				$update_success = false;
-				$failure_reason = isset( $health['message'] ) ? $health['message'] : 'Health check gagal.';
+				$failure_reason = isset( $health['message'] ) ? $health['message'] : 'Health check failed.';
 			}
 		}
 
 		@unlink( $tmp_zip );
 
 		if ( ! $update_success ) {
-			$events[] = $this->build_event( $item, 'rollback_started', 'rollback_started', 'Rollback dimulai.' );
+			$events[] = $this->build_event( $item, 'rollback_started', 'rollback_started', 'Rollback started.' );
 			$rollback = $this->rollback_manager->rollback( $target_path, $backup_path, $item );
 			if ( is_wp_error( $rollback ) ) {
 				$this->logger->log(
@@ -236,20 +236,20 @@ class UpdateEngine {
 						'item_slug' => $item['slug'],
 						'action'    => 'update_failed',
 						'status'    => 'update_failed',
-						'message'   => $failure_reason . ' | Rollback gagal.',
+						'message'   => $failure_reason . ' | Rollback failed.',
 					)
 				);
 
 				$events[] = $this->build_event( $item, 'rollback_failed', 'rollback_failed', $rollback->get_error_message() );
 				return array(
 					'status'  => 'rollback_failed',
-					'message' => $failure_reason . ' | Rollback gagal: ' . $rollback->get_error_message(),
+					'message' => $failure_reason . ' | Rollback failed: ' . $rollback->get_error_message(),
 					'events'  => $events,
 				);
 			}
 
 			$events[] = $this->build_event( $item, 'update_failed', 'update_failed', $failure_reason );
-			$events[] = $this->build_event( $item, 'rollback_success', 'rollback_success', 'Rollback berhasil.' );
+			$events[] = $this->build_event( $item, 'rollback_success', 'rollback_success', 'Rollback completed successfully.' );
 			$this->logger->log(
 				array(
 					'mode'      => 'child',
@@ -257,7 +257,7 @@ class UpdateEngine {
 					'item_slug' => $item['slug'],
 					'action'    => 'update_failed',
 					'status'    => 'update_failed',
-					'message'   => $failure_reason . ' | Rollback berhasil.',
+					'message'   => $failure_reason . ' | Rollback completed successfully.',
 				)
 			);
 
@@ -288,7 +288,7 @@ class UpdateEngine {
 
 		return array(
 			'status'  => 'update_success',
-			'message' => $fallback_used ? 'Update selesai (fallback).' : 'Update selesai (WP-native).',
+			'message' => $fallback_used ? 'Update completed (fallback).' : 'Update completed (WP-native).',
 			'events'  => $events,
 		);
 	}
@@ -319,7 +319,7 @@ class UpdateEngine {
 	 */
 	private function apply_core_update( array $item, $download_url ) {
 		$events = array();
-		$events[] = $this->build_event( $item, 'update_started', 'update_started', 'Update core dimulai.' );
+		$events[] = $this->build_event( $item, 'update_started', 'update_started', 'Core update started.' );
 
 		$tmp_zip = $this->download_package( $download_url );
 		if ( is_wp_error( $tmp_zip ) ) {
@@ -363,7 +363,7 @@ class UpdateEngine {
 
 		$health = $this->health_checker->run( wp_normalize_path( ABSPATH . 'wp-includes/version.php' ) );
 		if ( empty( $health['ok'] ) ) {
-			$message = isset( $health['message'] ) ? $health['message'] : 'Health check gagal setelah update core.';
+			$message = isset( $health['message'] ) ? $health['message'] : 'Health check failed after core update.';
 			$events[] = $this->build_event( $item, 'update_failed', 'update_failed', $message );
 			return array(
 				'status'  => 'update_failed',
@@ -372,11 +372,11 @@ class UpdateEngine {
 			);
 		}
 
-		$events[] = $this->build_event( $item, 'update_success', 'update_success', 'Update core berhasil.' );
+		$events[] = $this->build_event( $item, 'update_success', 'update_success', 'Core update completed successfully.' );
 
 		return array(
 			'status'  => 'update_success',
-			'message' => 'Update core berhasil.',
+			'message' => 'Core update completed successfully.',
 			'events'  => $events,
 		);
 	}
@@ -406,7 +406,7 @@ class UpdateEngine {
 			);
 
 			if ( is_wp_error( $result ) || false === $result ) {
-				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_plugin_fail', __( 'WP-native update plugin gagal.', 'rawatwp' ) );
+				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_plugin_fail', __( 'WP-native plugin update failed.', 'rawatwp' ) );
 			}
 
 			return true;
@@ -422,7 +422,7 @@ class UpdateEngine {
 			);
 
 			if ( is_wp_error( $result ) || false === $result ) {
-				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_theme_fail', __( 'WP-native update theme gagal.', 'rawatwp' ) );
+				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_theme_fail', __( 'WP-native theme update failed.', 'rawatwp' ) );
 			}
 
 			return true;
@@ -443,13 +443,13 @@ class UpdateEngine {
 
 			$result = $upgrader->upgrade( $offer );
 			if ( is_wp_error( $result ) || false === $result ) {
-				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_core_fail', __( 'WP-native update core gagal.', 'rawatwp' ) );
+				return is_wp_error( $result ) ? $result : new \WP_Error( 'rawatwp_wp_native_core_fail', __( 'WP-native core update failed.', 'rawatwp' ) );
 			}
 
 			return true;
 		}
 
-		return new \WP_Error( 'rawatwp_wp_native_unsupported', __( 'Type tidak didukung WP-native.', 'rawatwp' ) );
+		return new \WP_Error( 'rawatwp_wp_native_unsupported', __( 'Type is not supported by WP-native.', 'rawatwp' ) );
 	}
 
 	/**
@@ -505,7 +505,7 @@ class UpdateEngine {
 		$slug = sanitize_title( $item['slug'] );
 
 		if ( '' === $slug ) {
-			return new \WP_Error( 'rawatwp_bad_target_slug', __( 'Slug target tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_target_slug', __( 'Invalid target slug.', 'rawatwp' ) );
 		}
 
 		if ( 'plugin' === $type ) {
@@ -516,7 +516,7 @@ class UpdateEngine {
 			return wp_normalize_path( get_theme_root() . '/' . $slug );
 		}
 
-		return new \WP_Error( 'rawatwp_target_type_unsupported', __( 'Type target tidak didukung.', 'rawatwp' ) );
+		return new \WP_Error( 'rawatwp_target_type_unsupported', __( 'Target type is not supported.', 'rawatwp' ) );
 	}
 
 	/**
@@ -527,19 +527,19 @@ class UpdateEngine {
 	 */
 	private function validate_zip( $zip_path ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
-			return new \WP_Error( 'rawatwp_ziparchive_missing', __( 'ZipArchive tidak tersedia.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_ziparchive_missing', __( 'ZipArchive is not available.', 'rawatwp' ) );
 		}
 
 		$zip = new \ZipArchive();
 		if ( true !== $zip->open( $zip_path ) ) {
-			return new \WP_Error( 'rawatwp_bad_zip', __( 'zip tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_zip', __( 'Invalid zip.', 'rawatwp' ) );
 		}
 
 		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
 			$stat = $zip->statIndex( $index );
 			if ( ! $stat || empty( $stat['name'] ) ) {
 				$zip->close();
-				return new \WP_Error( 'rawatwp_bad_zip_entry', __( 'Entry zip tidak valid.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_bad_zip_entry', __( 'Entry Invalid zip.', 'rawatwp' ) );
 			}
 
 			$name = (string) $stat['name'];
@@ -552,7 +552,7 @@ class UpdateEngine {
 				$mode = ( $stat['external_attributes'] >> 16 ) & 0170000;
 				if ( 0120000 === $mode ) {
 					$zip->close();
-					return new \WP_Error( 'rawatwp_zip_symlink', __( 'zip berisi symlink dan ditolak.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_symlink', __( 'Zip contains symlink and is rejected.', 'rawatwp' ) );
 				}
 			}
 		}
@@ -619,7 +619,7 @@ class UpdateEngine {
 		);
 
 		if ( empty( $entries ) ) {
-			return new \WP_Error( 'rawatwp_empty_extract', __( 'Isi zip kosong.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_empty_extract', __( 'Zip content is empty.', 'rawatwp' ) );
 		}
 
 		$slug_path = $extract_dir . '/' . $target_slug;
@@ -720,7 +720,7 @@ class UpdateEngine {
 			}
 
 			if ( ! @copy( $source, $target ) ) {
-				return new \WP_Error( 'rawatwp_copy_failed', sprintf( 'Gagal menyalin file %s', $source ) );
+				return new \WP_Error( 'rawatwp_copy_failed', sprintf( 'Failed to copy file %s', $source ) );
 			}
 
 			return true;
@@ -732,7 +732,7 @@ class UpdateEngine {
 
 		$entries = scandir( $source );
 		if ( false === $entries ) {
-			return new \WP_Error( 'rawatwp_read_source_failed', __( 'Gagal membaca source update.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_read_source_failed', __( 'Failed to read update source.', 'rawatwp' ) );
 		}
 
 		foreach ( $entries as $entry ) {

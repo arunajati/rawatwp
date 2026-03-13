@@ -46,7 +46,7 @@ class ModeManager {
 		$mode = sanitize_key( $mode );
 
 		if ( ! in_array( $mode, array( 'master', 'child' ), true ) ) {
-			return new \WP_Error( 'rawatwp_invalid_mode', __( 'Mode tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_invalid_mode', __( 'Invalid mode.', 'rawatwp' ) );
 		}
 
 		$current_mode = $this->get_mode();

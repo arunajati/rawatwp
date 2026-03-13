@@ -76,11 +76,11 @@ class MasterManager {
 		$site_url  = $this->database->normalize_url( $site_url );
 
 		if ( '' === $site_name || '' === $site_url ) {
-			return new \WP_Error( 'rawatwp_bad_site_data', __( 'Nama site dan URL wajib diisi.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_site_data', __( 'Site name and URL are required.', 'rawatwp' ) );
 		}
 
 		if ( $this->database->get_site_by_url( $site_url ) ) {
-			return new \WP_Error( 'rawatwp_site_exists', __( 'Site sudah terdaftar.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_site_exists', __( 'Site is already registered.', 'rawatwp' ) );
 		}
 
 		$security_key = '' !== $security_key ? sanitize_text_field( $security_key ) : $this->security->generate_security_key();
@@ -102,14 +102,14 @@ class MasterManager {
 					'site_url' => $site_url,
 					'action'   => 'site_preregistered',
 					'status'   => 'failed',
-					'message'  => 'Gagal insert child site ke database.',
+					'message'  => 'Failed to insert child site into database.',
 					'context'  => array(
 						'db_error' => $db_error,
 					),
 				)
 			);
 
-			return new \WP_Error( 'rawatwp_site_insert_failed', __( 'Gagal menambahkan site child.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_site_insert_failed', __( 'Failed to add child site.', 'rawatwp' ) );
 		}
 
 		$this->logger->log(
@@ -118,7 +118,7 @@ class MasterManager {
 				'site_url' => $site_url,
 				'action'   => 'site_preregistered',
 				'status'   => 'success',
-				'message'  => 'Child site didaftarkan (pre-register).',
+				'message'  => 'Child site pre-registered.',
 			)
 		);
 
@@ -134,7 +134,7 @@ class MasterManager {
 	public function regenerate_site_key( $site_id ) {
 		$site = $this->database->get_site_by_id( $site_id );
 		if ( ! $site ) {
-			return new \WP_Error( 'rawatwp_site_not_found', __( 'Site tidak ditemukan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_site_not_found', __( 'Site not found.', 'rawatwp' ) );
 		}
 
 		$key = $this->security->generate_security_key();
@@ -148,7 +148,7 @@ class MasterManager {
 		);
 
 		if ( ! $updated ) {
-			return new \WP_Error( 'rawatwp_key_regenerate_failed', __( 'Gagal regenerate key.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_key_regenerate_failed', __( 'Failed to regenerate key.', 'rawatwp' ) );
 		}
 
 		$this->logger->log(
@@ -221,7 +221,7 @@ class MasterManager {
 				'item_slug' => $package['target_slug'],
 				'action'    => 'update_started',
 				'status'    => 'update_started',
-				'message'   => sprintf( 'Mulai push update %s:%s ke site %s.', $package['type'], $package['target_slug'], $site['site_name'] ),
+				'message'   => sprintf( 'Starting update push %s:%s to site %s.', $package['type'], $package['target_slug'], $site['site_name'] ),
 			)
 		);
 
@@ -246,7 +246,7 @@ class MasterManager {
 					'item_slug' => $package['target_slug'],
 					'action'    => 'update_failed',
 					'status'    => 'update_failed',
-					'message'   => 'Gagal push update: koneksi ke child bermasalah.',
+					'message'   => 'Failed to push update: child connection issue.',
 					'context'   => array(
 						'reason_code' => 'network_error',
 						'detail'      => $message,
@@ -256,7 +256,7 @@ class MasterManager {
 
 			return array(
 				'status'       => 'failed',
-				'message'      => 'Gagal koneksi ke child site.',
+				'message'      => 'Failed to connect to child site.',
 				'http_code'    => 0,
 				'is_transient' => true,
 				'reason_code'  => 'network_error',
@@ -268,7 +268,7 @@ class MasterManager {
 		$body      = json_decode( $raw_body, true );
 
 		$status  = 'failed';
-		$message = __( 'Tidak ada respons detail dari child.', 'rawatwp' );
+		$message = __( 'No detailed response from child.', 'rawatwp' );
 
 		if ( is_array( $body ) ) {
 			if ( isset( $body['status'] ) ) {
@@ -298,7 +298,7 @@ class MasterManager {
 		}
 
 		if ( $http_code >= 500 && false !== stripos( $message, 'critical error on this website' ) ) {
-			$message = __( 'Child mengalami error fatal saat proses update. Cek RawatWP Logs di child dan debug.log server child.', 'rawatwp' );
+			$message = __( 'Child encountered a fatal error during update. Check RawatWP Logs and child server debug.log.', 'rawatwp' );
 		}
 
 		$is_transient = false;
@@ -325,7 +325,7 @@ class MasterManager {
 				'item_slug' => $package['target_slug'],
 				'action'    => 'update_result',
 				'status'    => $status,
-				'message'   => in_array( $status, array( 'update_success', 'success' ), true ) ? 'Push update selesai dengan sukses.' : 'Push update gagal.',
+				'message'   => in_array( $status, array( 'update_success', 'success' ), true ) ? 'Update push completed successfully.' : 'Update push failed.',
 				'context'   => array(
 					'http_code'    => $http_code,
 					'reason_code'  => $reason_code,
@@ -355,14 +355,14 @@ class MasterManager {
 		$package = $this->package_manager->get_package( $package_id );
 		if ( ! $package ) {
 			return array(
-				'global_error' => __( 'Package tidak ditemukan.', 'rawatwp' ),
+				'global_error' => __( 'Package not found.', 'rawatwp' ),
 				'results'      => array(),
 			);
 		}
 
 		if ( ! in_array( $package['type'], array( 'plugin', 'theme', 'core' ), true ) ) {
 			return array(
-				'global_error' => __( 'Type package ini tidak didukung. Patch installer sudah dinonaktifkan.', 'rawatwp' ),
+				'global_error' => __( 'This package type is not supported. Patch installer is disabled.', 'rawatwp' ),
 				'results'      => array(),
 			);
 		}
@@ -377,7 +377,7 @@ class MasterManager {
 				$results[] = array(
 					'site_id' => $site_id,
 					'status'  => 'failed',
-					'message' => __( 'Site tidak ditemukan.', 'rawatwp' ),
+					'message' => __( 'Site not found.', 'rawatwp' ),
 				);
 				continue;
 			}
@@ -404,19 +404,19 @@ class MasterManager {
 	 */
 	public function rest_register( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$packet   = $request->get_json_params();
 		if ( ! is_array( $packet ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Payload JSON tidak valid.' ), 400 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
 		}
 
 		$site_url = isset( $packet['data']['site_url'] ) ? $packet['data']['site_url'] : '';
 		$site     = $this->database->get_site_by_url( $site_url );
 
 		if ( ! $site ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Site belum pre-register.' ), 404 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Site is not pre-registered yet.' ), 404 );
 		}
 
 		$verification = $this->security->verify_signed_packet( $packet, $site['security_key'], 'register_' . $site['id'] );
@@ -439,7 +439,7 @@ class MasterManager {
 				'site_url' => $site['site_url'],
 				'action'   => 'connected',
 				'status'   => 'connected',
-				'message'  => 'Child berhasil terkoneksi.',
+				'message'  => 'Child connected successfully.',
 			)
 		);
 
@@ -461,19 +461,19 @@ class MasterManager {
 	 */
 	public function rest_report( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$packet   = $request->get_json_params();
 		if ( ! is_array( $packet ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Payload JSON tidak valid.' ), 400 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
 		}
 
 		$site_url = isset( $packet['data']['site_url'] ) ? $packet['data']['site_url'] : '';
 		$site     = $this->database->get_site_by_url( $site_url );
 
 		if ( ! $site ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Site child tidak dikenal.' ), 404 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Unknown child site.' ), 404 );
 		}
 
 		$verification = $this->security->verify_signed_packet( $packet, $site['security_key'], 'report_' . $site['id'] );
@@ -516,7 +516,7 @@ class MasterManager {
 				'site_url' => $site['site_url'],
 				'action'   => 'reported',
 				'status'   => 'reported',
-				'message'  => sprintf( 'Child melaporkan %d item butuh update.', count( $items ) ),
+				'message'  => sprintf( 'Child reported %d item(s) needing updates.', count( $items ) ),
 				'context'  => array( 'items' => $items ),
 			)
 		);
@@ -538,19 +538,19 @@ class MasterManager {
 	 */
 	public function rest_log( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$packet   = $request->get_json_params();
 		if ( ! is_array( $packet ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Payload JSON tidak valid.' ), 400 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
 		}
 
 		$site_url = isset( $packet['data']['site_url'] ) ? $packet['data']['site_url'] : '';
 		$site     = $this->database->get_site_by_url( $site_url );
 
 		if ( ! $site ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Site child tidak dikenal.' ), 404 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Unknown child site.' ), 404 );
 		}
 
 		$verification = $this->security->verify_signed_packet( $packet, $site['security_key'], 'log_' . $site['id'] );
@@ -603,7 +603,7 @@ class MasterManager {
 	 */
 	public function rest_package_download( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$package_id = (int) $request->get_param( 'package_id' );
@@ -616,7 +616,7 @@ class MasterManager {
 		$site    = $this->database->get_site_by_id( $child_id );
 
 		if ( ! $package || ! $site ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Package/site tidak ditemukan.' ), 404 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Package/site not found.' ), 404 );
 		}
 
 		$verification = $this->security->verify_download_signature( $package_id, $child_id, $timestamp, $nonce, $signature, $site['security_key'] );
@@ -626,7 +626,7 @@ class MasterManager {
 
 		$file_path = $package['file_path'];
 		if ( ! file_exists( $file_path ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'File package tidak ditemukan.' ), 404 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Package file not found.' ), 404 );
 		}
 
 		$this->database->update_site(

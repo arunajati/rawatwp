@@ -44,7 +44,7 @@ class HealthChecker {
 		return array(
 			'ok'      => empty( $failed ),
 			'checks'  => $checks,
-			'message' => empty( $failed ) ? 'Health check ok.' : 'Health check gagal.',
+			'message' => empty( $failed ) ? 'Health check ok.' : 'Health check failed.',
 		);
 	}
 

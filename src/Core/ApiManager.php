@@ -147,7 +147,7 @@ class ApiManager {
 	 */
 	public function rest_queue_run( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$token = (string) $request->get_header( 'x-rawatwp-token' );
@@ -179,7 +179,7 @@ class ApiManager {
 	 */
 	public function rest_queue_status( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_master() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan master.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not master.' ), 403 );
 		}
 
 		$token = (string) $request->get_header( 'x-rawatwp-token' );

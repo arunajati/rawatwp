@@ -36,7 +36,7 @@ class BackupManager {
 		$slug        = sanitize_title( $slug );
 
 		if ( '' === $target_path || '' === $slug || ! file_exists( $target_path ) ) {
-			return new \WP_Error( 'rawatwp_backup_target_missing', __( 'Target backup tidak ditemukan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_backup_target_missing', __( 'Backup target not found.', 'rawatwp' ) );
 		}
 
 		$backup_root = $this->get_backup_root() . '/' . $slug;
@@ -68,7 +68,7 @@ class BackupManager {
 		$target_path = wp_normalize_path( $target_path );
 
 		if ( ! file_exists( $backup_path ) ) {
-			return new \WP_Error( 'rawatwp_backup_not_found', __( 'Backup tidak ditemukan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_backup_not_found', __( 'Backup not found.', 'rawatwp' ) );
 		}
 
 		if ( file_exists( $target_path ) ) {
@@ -95,7 +95,7 @@ class BackupManager {
 		$destination = wp_normalize_path( $destination );
 
 		if ( is_link( $source ) ) {
-			return new \WP_Error( 'rawatwp_symlink_source', __( 'Source backup symlink tidak diizinkan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_symlink_source', __( 'Backup source symlink is not allowed.', 'rawatwp' ) );
 		}
 
 		if ( is_file( $source ) ) {
@@ -105,7 +105,7 @@ class BackupManager {
 			}
 
 			if ( ! @copy( $source, $destination ) ) {
-				return new \WP_Error( 'rawatwp_copy_file_failed', sprintf( 'Gagal copy file %s', $source ) );
+				return new \WP_Error( 'rawatwp_copy_file_failed', sprintf( 'Failed to copy file %s', $source ) );
 			}
 
 			return true;
@@ -117,7 +117,7 @@ class BackupManager {
 
 		$entries = scandir( $source );
 		if ( false === $entries ) {
-			return new \WP_Error( 'rawatwp_read_dir_failed', sprintf( 'Gagal membaca folder %s', $source ) );
+			return new \WP_Error( 'rawatwp_read_dir_failed', sprintf( 'Failed to read directory %s', $source ) );
 		}
 
 		foreach ( $entries as $entry ) {

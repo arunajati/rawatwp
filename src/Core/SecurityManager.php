@@ -54,7 +54,7 @@ class SecurityManager {
 	 */
 	public function verify_signed_packet( array $packet, $key, $context = 'default' ) {
 		if ( empty( $packet['timestamp'] ) || empty( $packet['nonce'] ) || empty( $packet['signature'] ) || ! isset( $packet['data'] ) ) {
-			return new \WP_Error( 'rawatwp_bad_packet', __( 'Signed packet tidak lengkap.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_packet', __( 'Signed packet is incomplete.', 'rawatwp' ) );
 		}
 
 		$timestamp = (int) $packet['timestamp'];
@@ -72,7 +72,7 @@ class SecurityManager {
 		);
 
 		if ( ! hash_equals( $expected, (string) $packet['signature'] ) ) {
-			return new \WP_Error( 'rawatwp_bad_signature', __( 'Signature tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_signature', __( 'Invalid signature.', 'rawatwp' ) );
 		}
 
 		$nonce_key = 'rawatwp_nonce_' . md5( $context . '|' . $packet['nonce'] );
@@ -128,12 +128,12 @@ class SecurityManager {
 
 		$expected = $this->sign_download_tuple( $package_id, $child_id, $timestamp, $nonce, $key );
 		if ( ! hash_equals( $expected, (string) $signature ) ) {
-			return new \WP_Error( 'rawatwp_bad_download_signature', __( 'Token download tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_download_signature', __( 'Invalid download token.', 'rawatwp' ) );
 		}
 
 		$nonce_key = 'rawatwp_dl_nonce_' . md5( (string) $child_id . '|' . (string) $nonce );
 		if ( get_transient( $nonce_key ) ) {
-			return new \WP_Error( 'rawatwp_replay_download', __( 'Token download sudah dipakai.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_replay_download', __( 'Download token has already been used.', 'rawatwp' ) );
 		}
 
 		set_transient( $nonce_key, 1, self::TTL );
@@ -218,7 +218,7 @@ class SecurityManager {
 		$expected = $this->get_queue_runner_token();
 
 		if ( '' === $token || ! hash_equals( $expected, $token ) ) {
-			return new \WP_Error( 'rawatwp_bad_runner_token', __( 'Token worker queue tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_runner_token', __( 'Invalid queue worker token.', 'rawatwp' ) );
 		}
 
 		return true;

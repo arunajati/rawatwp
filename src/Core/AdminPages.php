@@ -234,7 +234,7 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - General</h1>
-			<p class="rawatwp-page-subtitle">Pengaturan utama plugin RawatWP.</p>
+			<p class="rawatwp-page-subtitle">Main settings for RawatWP.</p>
 			<?php $this->render_notices(); ?>
 			<div class="rawatwp-card">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -242,27 +242,27 @@ class AdminPages {
 					<input type="hidden" name="action" value="rawatwp_save_general_settings" />
 					<table class="form-table" role="presentation">
 						<tr>
-							<th scope="row"><label for="rawatwp_mode">Mode Aktif</label></th>
+							<th scope="row"><label for="rawatwp_mode">Active Mode</label></th>
 							<td>
 								<select id="rawatwp_mode" name="rawatwp_mode">
-									<option value="">Pilih Mode</option>
+									<option value="">Select Mode</option>
 									<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
 									<option value="child" <?php selected( $mode, 'child' ); ?>>Child</option>
 								</select>
-								<p class="description">Pilih satu mode:<br />- Master (untuk penyedia update)<br />- Child (untuk penerima update)</p>
+								<p class="description">Select one mode:<br />- Master (update provider)<br />- Child (update receiver)</p>
 							</td>
 						</tr>
 						<tr>
-							<th scope="row">Hapus Data Saat Uninstall</th>
+							<th scope="row">Delete Data on Uninstall</th>
 							<td>
 								<label>
 									<input type="checkbox" name="delete_all_on_uninstall" value="1" <?php checked( $delete_all_on_uninstall ); ?> />
-									Hapus Bersih
+									Fully Remove Data
 								</label>
 							</td>
 						</tr>
 					</table>
-					<?php submit_button( 'Simpan Pengaturan' ); ?>
+					<?php submit_button( 'Save Settings' ); ?>
 				</form>
 
 			</div>
@@ -281,11 +281,11 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Connection</h1>
-			<p class="rawatwp-page-subtitle">Hubungkan site Child ke Master.</p>
+			<p class="rawatwp-page-subtitle">Connect this Child site to Master.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'child' !== $mode ) : ?>
 				<div class="rawatwp-card">
-					<p>Halaman ini aktif hanya untuk mode Child.</p>
+					<p>This page is available only in Child mode.</p>
 				</div>
 			<?php else : ?>
 				<?php
@@ -315,7 +315,7 @@ class AdminPages {
 					</form>
 					<p><strong>Status:</strong> <?php echo $is_connected ? 'Connected' : 'Not connected'; ?></p>
 					<?php if ( ! empty( $settings['last_connected_at'] ) ) : ?>
-						<p><strong>Last connected:</strong> <?php echo esc_html( $this->format_datetime_for_display( $settings['last_connected_at'] ) ); ?></p>
+						<p><strong>Last Connected:</strong> <?php echo esc_html( $this->format_datetime_for_display( $settings['last_connected_at'] ) ); ?></p>
 					<?php endif; ?>
 					<?php if ( ! empty( $settings['child_id'] ) ) : ?>
 						<p><strong>Child ID:</strong> <?php echo esc_html( (string) $settings['child_id'] ); ?></p>
@@ -337,31 +337,31 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Monitored Items</h1>
-			<p class="rawatwp-page-subtitle">Kelola item plugin/theme yang dipantau pada mode Child.</p>
+			<p class="rawatwp-page-subtitle">Manage monitored plugin/theme items in Child mode.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'child' !== $mode ) : ?>
 				<div class="rawatwp-card">
-					<p>Halaman ini aktif hanya untuk mode Child.</p>
+					<p>This page is available only in Child mode.</p>
 				</div>
 			<?php else : ?>
 				<div class="rawatwp-card">
-					<p><strong>Alur paling mudah:</strong> 1) Klik scan plugin/theme, 2) tandai item yang butuh update, 3) klik kirim report ke Master.</p>
+					<p><strong>Simple flow:</strong> 1) Scan installed plugins/themes, 2) mark items that need updates, 3) send report to Master.</p>
 
 					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_scan_installed_items' ); ?>
 						<input type="hidden" name="action" value="rawatwp_scan_installed_items" />
-						<?php submit_button( '1) Scan Plugin & Theme Terpasang', 'primary', 'submit', false ); ?>
+						<?php submit_button( '1) Scan Installed Plugins & Themes', 'primary', 'submit', false ); ?>
 					</form>
 
 					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_scan_now' ); ?>
 						<input type="hidden" name="action" value="rawatwp_scan_now" />
-						<?php submit_button( '3) Kirim Report ke Master', 'secondary', 'submit', false ); ?>
+						<?php submit_button( '3) Send Report to Master', 'secondary', 'submit', false ); ?>
 					</form>
 				</div>
 
 				<div class="rawatwp-card">
-					<h2>Daftar Monitored Items</h2>
+					<h2>Monitored Items List</h2>
 					<table class="widefat striped">
 						<thead>
 							<tr>
@@ -379,7 +379,7 @@ class AdminPages {
 							if ( empty( $monitored_items ) ) :
 								?>
 								<tr>
-									<td colspan="6">Belum ada item. Klik tombol scan agar plugin/theme otomatis masuk ke daftar.</td>
+									<td colspan="6">No items yet. Click scan to auto-import installed plugins/themes into the list.</td>
 								</tr>
 							<?php else : ?>
 								<?php foreach ( $monitored_items as $item ) : ?>
@@ -395,7 +395,7 @@ class AdminPages {
 											<input type="hidden" name="action" value="rawatwp_toggle_item" />
 											<input type="hidden" name="item_id" value="<?php echo esc_attr( $item['id'] ); ?>" />
 											<input type="hidden" name="needs_update" value="<?php echo ! empty( $item['needs_update'] ) ? '0' : '1'; ?>" />
-											<button class="button" type="submit"><?php echo ! empty( $item['needs_update'] ) ? 'Sudah Aman' : 'Butuh Update'; ?></button>
+											<button class="button" type="submit"><?php echo ! empty( $item['needs_update'] ) ? 'Marked Safe' : 'Needs Update'; ?></button>
 										</form>
 										<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 											<?php wp_nonce_field( 'rawatwp_delete_item' ); ?>
@@ -426,11 +426,11 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Sites</h1>
-			<p class="rawatwp-page-subtitle">Kelola daftar child site yang terhubung ke Master.</p>
+			<p class="rawatwp-page-subtitle">Manage child sites connected to Master.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'master' !== $mode ) : ?>
 				<div class="rawatwp-card">
-					<p>Halaman ini aktif hanya untuk mode Master.</p>
+					<p>This page is available only in Master mode.</p>
 				</div>
 			<?php else : ?>
 				<div class="rawatwp-card">
@@ -439,25 +439,25 @@ class AdminPages {
 						<input type="hidden" name="action" value="rawatwp_add_site" />
 						<div class="rawatwp-field-stack">
 							<p class="rawatwp-field-group">
-								<label for="rawatwp-site-name"><strong>Nama Site Child</strong></label>
+								<label for="rawatwp-site-name"><strong>Child Site Name</strong></label>
 								<input id="rawatwp-site-name" class="regular-text" type="text" name="site_name" required />
 							</p>
 							<p class="rawatwp-field-group">
-								<label for="rawatwp-site-url"><strong>Domain / URL Child</strong></label>
+								<label for="rawatwp-site-url"><strong>Child Domain / URL</strong></label>
 								<input id="rawatwp-site-url" class="regular-text" type="url" name="site_url" required />
 							</p>
 						</div>
-						<?php submit_button( 'Tambah Child Site (Pre-register)' ); ?>
+						<?php submit_button( 'Add Child Site (Pre-register)' ); ?>
 					</form>
 				</div>
 
 				<div class="rawatwp-card">
-					<h2>Daftar Child Sites</h2>
+					<h2>Child Site List</h2>
 					<table class="widefat striped rawatwp-sites-table">
 						<thead>
 							<tr>
 								<th class="rawatwp-col-id">ID</th>
-								<th class="rawatwp-col-site">Nama Site</th>
+								<th class="rawatwp-col-site">Site Name</th>
 								<th class="rawatwp-col-domain">Domain</th>
 								<th class="rawatwp-col-key">Security Key</th>
 								<th class="rawatwp-col-status">Status</th>
@@ -552,42 +552,39 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Packages</h1>
-			<p class="rawatwp-page-subtitle">Upload, scan, dan kelola package update.</p>
+			<p class="rawatwp-page-subtitle">Upload, scan, and manage update packages.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'master' !== $mode ) : ?>
 				<div class="rawatwp-card">
-					<p>Halaman ini aktif hanya untuk mode Master.</p>
+					<p>This page is available only in Master mode.</p>
 				</div>
 			<?php else : ?>
 				<div class="rawatwp-card">
 					<form id="rawatwp-package-upload-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
 						<input type="hidden" name="action" value="rawatwp_upload_package" />
-						<table class="form-table" role="presentation">
-							<tr>
-								<th scope="row">File zip</th>
-								<td>
-									<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
-									<p id="rawatwp-upload-file-count" class="description"></p>
-									<p id="rawatwp-upload-progress-wrap" class="rawatwp-upload-progress">
-										Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
-									</p>
-								</td>
-							</tr>
-						</table>
-						<?php submit_button( 'Upload package zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
-					</form>
-
-					<form class="rawatwp-inline-form rawatwp-package-scan-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-						<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
-						<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
-						<?php submit_button( 'Scan Available Packages', 'secondary', 'submit', false ); ?>
+						<div class="rawatwp-upload-stack">
+							<label for="rawatwp-package-zip-input"><strong>Choose zip file</strong></label>
+							<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
+							<p id="rawatwp-upload-file-count" class="description"></p>
+							<p id="rawatwp-upload-progress-wrap" class="rawatwp-upload-progress">
+								Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
+							</p>
+						</div>
+						<?php submit_button( 'Upload zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
 					</form>
 				</div>
 
 				<div class="rawatwp-card">
-					<h2>Daftar Package</h2>
-					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File zip dan data package akan dihapus permanen.');">
+					<div class="rawatwp-card-header">
+						<h2>Package List</h2>
+						<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
+							<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
+							<?php submit_button( 'Scan Available Packages', 'secondary', 'submit', false ); ?>
+						</form>
+					</div>
+					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete all selected packages? The zip files and package data will be permanently removed.');">
 						<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
 						<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
 						<select name="bulk_action" required>
@@ -616,7 +613,7 @@ class AdminPages {
 						<?php $packages = $this->package_manager->get_packages(); ?>
 						<?php if ( empty( $packages ) ) : ?>
 							<tr>
-								<td colspan="8">Belum ada package.</td>
+								<td colspan="8">No packages yet.</td>
 							</tr>
 						<?php else : ?>
 							<?php foreach ( $packages as $package ) : ?>
@@ -637,7 +634,7 @@ class AdminPages {
 									<td><?php echo esc_html( $package['file_name'] ); ?></td>
 									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $package['created_at'] ) ? $package['created_at'] : '' ) ); ?></td>
 									<td>
-										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus package ini? File zip dan data package akan dihapus permanen.');">
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this package? The zip file and package data will be permanently removed.');">
 											<?php wp_nonce_field( 'rawatwp_delete_package' ); ?>
 											<input type="hidden" name="action" value="rawatwp_delete_package" />
 											<input type="hidden" name="package_id" value="<?php echo esc_attr( (string) $package['id'] ); ?>" />
@@ -679,7 +676,7 @@ class AdminPages {
 						if (fileInput && fileCountInfo) {
 							fileInput.addEventListener('change', function() {
 								var count = fileInput.files ? fileInput.files.length : 0;
-								fileCountInfo.textContent = count > 0 ? (count + ' file dipilih') : '';
+								fileCountInfo.textContent = count > 0 ? (count + ' file(s) selected') : '';
 							});
 						}
 
@@ -755,11 +752,11 @@ class AdminPages {
 		?>
 			<div class="wrap rawatwp-admin">
 				<h1>RawatWP - Updates</h1>
-				<p class="rawatwp-page-subtitle">Kirim update ke child site dengan alur yang sederhana.</p>
+				<p class="rawatwp-page-subtitle">Send updates to child sites with a simple workflow.</p>
 				<?php $this->render_notices(); ?>
 				<?php if ( 'master' !== $mode ) : ?>
 					<div class="rawatwp-card">
-						<p>Halaman ini aktif hanya untuk mode Master.</p>
+						<p>This page is available only in Master mode.</p>
 					</div>
 				<?php else : ?>
 					<?php
@@ -797,29 +794,29 @@ class AdminPages {
 					}
 					$queue_total_active = $on_queue_count + $processing_count;
 					$status_labels      = array(
-						'on_queue'   => 'Dalam Antrian',
-						'processing' => 'Sedang Diproses',
-						'success'    => 'Berhasil',
-						'failed'     => 'Gagal',
+						'on_queue'   => 'On Queue',
+						'processing' => 'Processing',
+						'success'    => 'Success',
+						'failed'     => 'Failed',
 					);
 					?>
 					<div class="rawatwp-card">
-						<h2>Ringkasan Cepat</h2>
+						<h2>Quick Summary</h2>
 						<div class="rawatwp-update-kpis">
 						<div class="rawatwp-update-kpi">
-							<span class="label">Total Child Site</span>
+							<span class="label">Total Child Sites</span>
 							<span class="value"><?php echo esc_html( (string) count( $child_sites ) ); ?></span>
 						</div>
 						<div class="rawatwp-update-kpi">
-							<span class="label">Site Butuh Update</span>
+							<span class="label">Sites Needing Updates</span>
 							<span class="value"><?php echo esc_html( (string) $needs_update_site ); ?></span>
 						</div>
 						<div class="rawatwp-update-kpi">
-							<span class="label">Sedang/Antri Proses</span>
+							<span class="label">Processing / Queued</span>
 							<span class="value"><?php echo esc_html( (string) $queue_total_active ); ?></span>
 						</div>
 						<div class="rawatwp-update-kpi">
-							<span class="label">Berhasil / Gagal</span>
+							<span class="label">Success / Failed</span>
 							<span class="value"><?php echo esc_html( (string) $success_count . ' / ' . (string) $failed_count ); ?></span>
 							</div>
 						</div>
@@ -828,30 +825,30 @@ class AdminPages {
 							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 								<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
 								<input type="hidden" name="action" value="rawatwp_queue_run_now" />
-								<?php submit_button( 'Proses Queue Sekarang', 'secondary', 'submit', false ); ?>
+								<?php submit_button( 'Run Queue Now', 'secondary', 'submit', false ); ?>
 							</form>
 
 							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 								<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
 								<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
 								<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
-								<?php submit_button( $queue_paused ? 'Lanjutkan Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
+								<?php submit_button( $queue_paused ? 'Resume Queue' : 'Pause Queue', 'secondary', 'submit', false ); ?>
 							</form>
 						</div>
-						<p class="description">Status queue saat ini: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
+						<p class="description">Current queue status: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
 					</div>
 
 					<div class="rawatwp-card">
-						<h2>Kirim Update</h2>
+						<h2>Send Update</h2>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
 						<input type="hidden" name="action" value="rawatwp_push_update" />
 						<table class="form-table" role="presentation">
 							<tr>
-							<th scope="row">Pilih Package</th>
+							<th scope="row">Select Package</th>
 							<td>
 								<select name="package_id" required>
-									<option value="">Pilih package</option>
+									<option value="">Select package</option>
 									<?php foreach ( $packages as $package ) : ?>
 										<option value="<?php echo esc_attr( (string) $package['id'] ); ?>"><?php echo esc_html( $package['label'] . ' [' . $package['type'] . ':' . $package['target_slug'] . ']' ); ?></option>
 									<?php endforeach; ?>
@@ -859,11 +856,11 @@ class AdminPages {
 							</td>
 							</tr>
 							<tr>
-								<th scope="row">Pilih Child Site</th>
+								<th scope="row">Select Child Sites</th>
 								<td>
 									<label class="rawatwp-select-all-sites">
 										<input type="checkbox" id="rawatwp-select-all-sites" />
-										Pilih semua child site
+										Select all child sites
 									</label>
 									<div class="rawatwp-updates-site-list">
 										<?php foreach ( $child_sites as $site ) : ?>
@@ -878,7 +875,7 @@ class AdminPages {
 													<?php
 													echo esc_html(
 														sprintf(
-															'Status: %s | Butuh update: %d item',
+															'Status: %s | Needs update: %d item(s)',
 															isset( $site['connection_status'] ) ? (string) $site['connection_status'] : '-',
 															$needs_count
 														)
@@ -891,12 +888,12 @@ class AdminPages {
 								</td>
 							</tr>
 						</table>
-						<?php submit_button( 'Kirim Update Sekarang' ); ?>
+						<?php submit_button( 'Send Update Now' ); ?>
 						</form>
 					</div>
 
 					<div class="rawatwp-card">
-						<h2>Progress Update</h2>
+						<h2>Update Progress</h2>
 						<table class="widefat striped">
 						<thead>
 							<tr>
@@ -910,7 +907,7 @@ class AdminPages {
 						<tbody>
 							<?php if ( empty( $queue_rows ) ) : ?>
 								<tr>
-									<td colspan="5">Belum ada proses update.</td>
+									<td colspan="5">No update process yet.</td>
 								</tr>
 							<?php else : ?>
 								<?php foreach ( $queue_rows as $row ) : ?>
@@ -945,14 +942,14 @@ class AdminPages {
 						</table>
 
 						<details class="rawatwp-advanced-updates">
-							<summary>Pengaturan Lanjutan</summary>
-							<p class="rawatwp-mt-2"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Aktifkan worker browser saat halaman ini terbuka</label></p>
+							<summary>Advanced Settings</summary>
+							<p class="rawatwp-mt-2"><label><input type="checkbox" id="rawatwp-browser-worker-enable" checked> Enable browser worker while this page is open</label></p>
 							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<?php wp_nonce_field( 'rawatwp_regenerate_runner_token' ); ?>
 							<input type="hidden" name="action" value="rawatwp_regenerate_runner_token" />
 							<?php submit_button( 'Regenerate Runner Token', 'secondary', 'submit', false ); ?>
 							</form>
-							<p class="description">URL runner untuk system cron (1 menit sekali):</p>
+							<p class="description">Runner URL for system cron (every 1 minute):</p>
 							<p><code class="rawatwp-break-word"><?php echo esc_html( $runner_url ); ?></code></p>
 						</details>
 					</div>
@@ -1028,10 +1025,10 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Logs</h1>
-			<p class="rawatwp-page-subtitle">Riwayat aktivitas update dan koneksi RawatWP.</p>
+			<p class="rawatwp-page-subtitle">Update and connection activity history for RawatWP.</p>
 			<?php $this->render_notices(); ?>
 			<div class="rawatwp-card">
-				<p>Log otomatis dirawat: hapus data lebih dari 30 hari dan batasi maksimal 10.000 baris terbaru agar database tetap ringan.</p>
+				<p>Logs are auto-maintained: delete data older than 30 days and cap at latest 10,000 rows to keep database light.</p>
 				<table class="widefat striped">
 					<thead>
 						<tr>
@@ -1059,7 +1056,7 @@ class AdminPages {
 					</tbody>
 				</table>
 				<div class="rawatwp-log-actions">
-					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear semua log RawatWP?');">
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all RawatWP logs?');">
 						<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
 						<input type="hidden" name="action" value="rawatwp_clear_logs" />
 						<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
@@ -1092,7 +1089,7 @@ class AdminPages {
 			)
 		);
 
-		$this->redirect_with_notice( 'rawatwp-general', 'Pengaturan berhasil disimpan.', '' );
+		$this->redirect_with_notice( 'rawatwp-general', 'Settings saved successfully.', '' );
 	}
 
 	/**
@@ -1112,7 +1109,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-connection', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-connection', 'Connected ke Master.', '' );
+		$this->redirect_with_notice( 'rawatwp-connection', 'Connected to Master.', '' );
 	}
 
 	/**
@@ -1124,7 +1121,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_disconnect_child' );
 
 		if ( ! $this->child_manager->disconnect() ) {
-			$this->redirect_with_notice( 'rawatwp-connection', '', 'Gagal disconnect.' );
+			$this->redirect_with_notice( 'rawatwp-connection', '', 'Disconnect failed.' );
 		}
 
 		$this->redirect_with_notice( 'rawatwp-connection', 'Child disconnected.', '' );
@@ -1156,7 +1153,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-monitored-items', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Monitored item ditambahkan.', '' );
+		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Monitored item added.', '' );
 	}
 
 	/**
@@ -1171,10 +1168,10 @@ class AdminPages {
 		$needs_update = ! empty( $_POST['needs_update'] );
 
 		if ( ! $this->monitored_items->set_needs_update( $item_id, $needs_update ) ) {
-			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'Gagal update status monitored item.' );
+			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'Failed to update monitored item status.' );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Status monitored item diperbarui.', '' );
+		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Monitored item status updated.', '' );
 	}
 
 	/**
@@ -1188,10 +1185,10 @@ class AdminPages {
 		$item_id = isset( $_POST['item_id'] ) ? sanitize_text_field( wp_unslash( $_POST['item_id'] ) ) : '';
 
 		if ( ! $this->monitored_items->remove_item( $item_id ) ) {
-			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'Monitored item tidak ditemukan.' );
+			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'Monitored item not found.' );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Monitored item dihapus.', '' );
+		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Monitored item deleted.', '' );
 	}
 
 	/**
@@ -1207,7 +1204,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-monitored-items', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Report needs-update berhasil dikirim ke master.', '' );
+		$this->redirect_with_notice( 'rawatwp-monitored-items', 'Needs-update report sent to master.', '' );
 	}
 
 	/**
@@ -1219,13 +1216,13 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_scan_installed_items' );
 
 		if ( 'child' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'Fitur ini hanya untuk mode Child.' );
+			$this->redirect_with_notice( 'rawatwp-monitored-items', '', 'This feature is available only in Child mode.' );
 		}
 
 		$result = $this->monitored_items->import_installed_items();
 
 		$message = sprintf(
-			'Scan selesai. Ditambahkan: %d, Dilewati: %d, Plugin ditemukan: %d, Theme ditemukan: %d.',
+			'Scan complete. Added: %d, Skipped: %d, Plugins found: %d, Themes found: %d.',
 			(int) $result['added'],
 			(int) $result['skipped'],
 			(int) $result['plugins_found'],
@@ -1252,7 +1249,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-sites', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-sites', 'Child site berhasil ditambahkan.', '' );
+		$this->redirect_with_notice( 'rawatwp-sites', 'Child site added successfully.', '' );
 	}
 
 	/**
@@ -1270,7 +1267,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-sites', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-sites', 'Security key child berhasil diganti.', '' );
+		$this->redirect_with_notice( 'rawatwp-sites', 'Child security key regenerated successfully.', '' );
 	}
 
 	/**
@@ -1282,7 +1279,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_upload_package' );
 
 		if ( empty( $_FILES['package_zip'] ) || ! is_array( $_FILES['package_zip'] ) ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'File zip tidak ditemukan.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'Zip file not found.' );
 		}
 
 		$uploaded = $_FILES['package_zip'];
@@ -1306,7 +1303,7 @@ class AdminPages {
 		}
 
 		if ( empty( $files ) ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Tidak ada file zip yang dipilih.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'No zip file selected.' );
 		}
 
 		$success = 0;
@@ -1325,7 +1322,7 @@ class AdminPages {
 
 		if ( $failed > 0 ) {
 			$error = sprintf(
-				'Upload selesai dengan sebagian gagal. Berhasil: %d, Gagal: %d. %s',
+				'Upload completed with partial failures. Success: %d, Failed: %d. %s',
 				$success,
 				$failed,
 				implode( ' | ', array_slice( $errors, 0, 2 ) )
@@ -1333,7 +1330,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-packages', '', $error );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-packages', sprintf( '%d file zip berhasil diupload.', $success ), '' );
+		$this->redirect_with_notice( 'rawatwp-packages', sprintf( '%d zip file(s) uploaded successfully.', $success ), '' );
 	}
 
 	/**
@@ -1345,7 +1342,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_scan_updates_folder' );
 
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Fitur ini hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'This feature is available only in Master mode.' );
 		}
 
 		$result = $this->package_manager->scan_updates_directory();
@@ -1354,7 +1351,7 @@ class AdminPages {
 		}
 
 		$message = sprintf(
-			'Scan folder selesai. Total zip: %d, Import: %d, Skip: %d, Gagal: %d.',
+			'Folder scan complete. Total zip: %d, Imported: %d, Skipped: %d, Failed: %d.',
 			(int) $result['total'],
 			(int) $result['imported'],
 			(int) $result['skipped'],
@@ -1373,12 +1370,12 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_delete_package' );
 
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Fitur ini hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'This feature is available only in Master mode.' );
 		}
 
 		$package_id = isset( $_POST['package_id'] ) ? (int) $_POST['package_id'] : 0;
 		if ( $package_id <= 0 ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Package tidak valid.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'Invalid package.' );
 		}
 
 		$result = $this->package_manager->delete_package( $package_id );
@@ -1386,7 +1383,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-packages', '', $result->get_error_message() );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-packages', 'Package berhasil dihapus.', '' );
+		$this->redirect_with_notice( 'rawatwp-packages', 'Package deleted successfully.', '' );
 	}
 
 	/**
@@ -1398,31 +1395,31 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_bulk_delete_packages' );
 
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Fitur ini hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'This feature is available only in Master mode.' );
 		}
 
 		$bulk_action = isset( $_POST['bulk_action'] ) ? sanitize_key( wp_unslash( $_POST['bulk_action'] ) ) : '';
 		$package_ids = isset( $_POST['package_ids'] ) && is_array( $_POST['package_ids'] ) ? array_map( 'intval', $_POST['package_ids'] ) : array();
 
 		if ( 'delete' !== $bulk_action ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Pilih bulk action terlebih dulu.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'Please select a bulk action first.' );
 		}
 
 		if ( empty( $package_ids ) ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Pilih minimal satu package.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'Select at least one package.' );
 		}
 
 		$result = $this->package_manager->delete_packages( $package_ids );
 		if ( (int) $result['failed'] > 0 ) {
 			$error = sprintf(
-				'Hapus bulk selesai dengan sebagian gagal. Berhasil: %d, Gagal: %d.',
+				'Bulk delete completed with partial failures. Success: %d, Failed: %d.',
 				(int) $result['deleted'],
 				(int) $result['failed']
 			);
 			$this->redirect_with_notice( 'rawatwp-packages', '', $error );
 		}
 
-		$notice = sprintf( 'Bulk delete selesai. %d package dihapus.', (int) $result['deleted'] );
+		$notice = sprintf( 'Bulk delete completed. %d package(s) deleted.', (int) $result['deleted'] );
 		$this->redirect_with_notice( 'rawatwp-packages', $notice, '' );
 	}
 
@@ -1434,14 +1431,14 @@ class AdminPages {
 	public function handle_push_update() {
 		$this->assert_admin_post( 'rawatwp_push_update' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-updates', '', 'Fitur ini hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'This feature is available only in Master mode.' );
 		}
 
 		$package_id = isset( $_POST['package_id'] ) ? (int) $_POST['package_id'] : 0;
 		$site_ids   = isset( $_POST['site_ids'] ) && is_array( $_POST['site_ids'] ) ? array_map( 'intval', $_POST['site_ids'] ) : array();
 
 		if ( $package_id <= 0 || empty( $site_ids ) ) {
-			$this->redirect_with_notice( 'rawatwp-updates', '', 'Pilih package dan minimal satu child site.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'Select one package and at least one child site.' );
 		}
 
 		$result = $this->queue_manager->enqueue_batch( $package_id, $site_ids );
@@ -1450,7 +1447,7 @@ class AdminPages {
 		}
 
 		$message = sprintf(
-			'Queue dibuat. Batch: %s | On queue: %d | Skip: %d',
+			'Queue created. Batch: %s | On queue: %d | Skipped: %d',
 			$result['batch_id'],
 			(int) $result['queued'],
 			(int) $result['skipped']
@@ -1467,10 +1464,10 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_clear_logs' );
 
 		if ( ! $this->logger->clear_logs() ) {
-			$this->redirect_with_notice( 'rawatwp-logs', '', 'Gagal clear logs.' );
+			$this->redirect_with_notice( 'rawatwp-logs', '', 'Failed to clear logs.' );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-logs', 'Logs berhasil dibersihkan.', '' );
+		$this->redirect_with_notice( 'rawatwp-logs', 'Logs cleared successfully.', '' );
 	}
 
 	/**
@@ -1481,12 +1478,12 @@ class AdminPages {
 	public function handle_queue_run_now() {
 		$this->assert_admin_post( 'rawatwp_queue_run_now' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-updates', '', 'Fitur queue hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'Queue feature is available only in Master mode.' );
 		}
 
 		$result = $this->queue_manager->run_worker( 'admin_manual', 1 );
 		$notice = sprintf(
-			'Queue dijalankan manual. Diproses: %d, Pending: %d, Processing: %d.',
+			'Queue processed manually. Processed: %d, Pending: %d, Processing: %d.',
 			(int) $result['processed'],
 			(int) $result['counts']['on_queue'],
 			(int) $result['counts']['processing']
@@ -1503,17 +1500,17 @@ class AdminPages {
 	public function handle_queue_pause_toggle() {
 		$this->assert_admin_post( 'rawatwp_queue_pause_toggle' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-updates', '', 'Fitur queue hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'Queue feature is available only in Master mode.' );
 		}
 
 		$pause_value = isset( $_POST['pause_value'] ) ? sanitize_key( wp_unslash( $_POST['pause_value'] ) ) : '0';
 		if ( '1' === $pause_value ) {
 			$this->queue_manager->pause_queue();
-			$this->redirect_with_notice( 'rawatwp-updates', 'Queue di-pause.', '' );
+			$this->redirect_with_notice( 'rawatwp-updates', 'Queue paused.', '' );
 		}
 
 		$this->queue_manager->resume_queue();
-		$this->redirect_with_notice( 'rawatwp-updates', 'Queue dilanjutkan.', '' );
+		$this->redirect_with_notice( 'rawatwp-updates', 'Queue resumed.', '' );
 	}
 
 	/**
@@ -1524,11 +1521,11 @@ class AdminPages {
 	public function handle_regenerate_runner_token() {
 		$this->assert_admin_post( 'rawatwp_regenerate_runner_token' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-updates', '', 'Fitur runner hanya untuk mode Master.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'Runner feature is available only in Master mode.' );
 		}
 
 		$this->security->regenerate_queue_runner_token();
-		$this->redirect_with_notice( 'rawatwp-updates', 'Runner token berhasil diganti.', '' );
+		$this->redirect_with_notice( 'rawatwp-updates', 'Runner token regenerated successfully.', '' );
 	}
 
 	/**
@@ -1540,7 +1537,7 @@ class AdminPages {
 		$this->assert_admin();
 		check_ajax_referer( 'rawatwp_queue_ajax' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			wp_send_json_error( array( 'message' => 'Fitur queue hanya untuk mode Master.' ), 403 );
+			wp_send_json_error( array( 'message' => 'Queue feature is available only in Master mode.' ), 403 );
 		}
 
 		$result = $this->queue_manager->run_worker( 'browser_worker', 1 );
@@ -1564,7 +1561,7 @@ class AdminPages {
 		$this->assert_admin();
 		check_ajax_referer( 'rawatwp_queue_ajax' );
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			wp_send_json_error( array( 'message' => 'Fitur queue hanya untuk mode Master.' ), 403 );
+			wp_send_json_error( array( 'message' => 'Queue feature is available only in Master mode.' ), 403 );
 		}
 
 		wp_send_json_success(
@@ -1593,7 +1590,7 @@ class AdminPages {
 		}
 
 		$latest_version = is_array( $result ) && isset( $result['version'] ) ? sanitize_text_field( (string) $result['version'] ) : '-';
-		$notice         = 'Cek update RawatWP selesai, versi terbaru saat ini: ' . $latest_version;
+		$notice         = 'RawatWP update check completed, latest version: ' . $latest_version;
 
 		if ( '' !== $redirect_url ) {
 			$this->redirect_to_url_with_notice( $redirect_url, $notice, '' );
@@ -1661,7 +1658,7 @@ class AdminPages {
 	 */
 	private function assert_admin() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Anda tidak punya izin untuk akses halaman ini.', 'rawatwp' ) );
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'rawatwp' ) );
 		}
 	}
 

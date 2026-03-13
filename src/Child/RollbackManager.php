@@ -49,7 +49,7 @@ class RollbackManager {
 				'item_slug' => $item['slug'],
 				'action'    => 'rollback_started',
 				'status'    => 'rollback_started',
-				'message'   => 'Rollback dimulai.',
+				'message'   => 'Rollback started.',
 			)
 		);
 
@@ -75,7 +75,7 @@ class RollbackManager {
 				'item_slug' => $item['slug'],
 				'action'    => 'rollback_success',
 				'status'    => 'rollback_success',
-				'message'   => 'Rollback berhasil.',
+				'message'   => 'Rollback completed successfully.',
 			)
 		);
 

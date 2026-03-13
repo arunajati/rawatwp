@@ -26,6 +26,22 @@
 	font-size: 20px;
 }
 
+.rawatwp-admin .rawatwp-card-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--rawatwp-space-2);
+	margin-bottom: var(--rawatwp-space-2);
+}
+
+.rawatwp-admin .rawatwp-card-header > h2 {
+	margin: 0;
+}
+
+.rawatwp-admin .rawatwp-card-header .submit {
+	margin: 0;
+}
+
 .rawatwp-admin .rawatwp-card > :last-child {
 	margin-bottom: 0;
 }
@@ -162,9 +178,18 @@
 	min-width: 180px;
 }
 
-.rawatwp-admin .rawatwp-package-scan-form {
+.rawatwp-admin .rawatwp-upload-stack {
+	max-width: 560px;
+}
+
+.rawatwp-admin .rawatwp-upload-stack label {
 	display: block;
-	margin-top: var(--rawatwp-space-2);
+	margin-bottom: var(--rawatwp-space-1);
+}
+
+.rawatwp-admin .rawatwp-upload-stack input[type="file"] {
+	display: inline-block;
+	margin-bottom: var(--rawatwp-space-1);
 }
 
 .rawatwp-admin .rawatwp-package-table {

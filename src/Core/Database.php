@@ -727,7 +727,7 @@ class Database {
 			array(
 				'status'       => 'processing',
 				'progress'     => 10,
-				'message'      => 'Sedang diproses oleh worker.',
+				'message'      => 'Being processed by worker.',
 				'worker_id'    => $worker_id,
 				'started_at'   => current_time( 'mysql' ),
 				'heartbeat_at' => current_time( 'mysql' ),

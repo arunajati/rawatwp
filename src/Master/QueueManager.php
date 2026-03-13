@@ -82,20 +82,20 @@ class QueueManager {
 	public function enqueue_batch( $package_id, array $site_ids ) {
 		$package = $this->package_manager->get_package( $package_id );
 		if ( ! $package ) {
-			return new \WP_Error( 'rawatwp_package_not_found', __( 'Package tidak ditemukan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_not_found', __( 'Package not found.', 'rawatwp' ) );
 		}
 
 		if ( ! in_array( $package['type'], array( 'plugin', 'theme', 'core' ), true ) ) {
-			return new \WP_Error( 'rawatwp_package_type_unsupported', __( 'Type package ini tidak didukung.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_type_unsupported', __( 'This package type is not supported.', 'rawatwp' ) );
 		}
 
 		$site_ids = array_values( array_unique( array_filter( array_map( 'intval', $site_ids ) ) ) );
 		if ( empty( $site_ids ) ) {
-			return new \WP_Error( 'rawatwp_empty_sites', __( 'Pilih minimal satu child site.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_empty_sites', __( 'Select at least one child site.', 'rawatwp' ) );
 		}
 
 		if ( 'core' === $package['type'] && count( $site_ids ) > 1 ) {
-			return new \WP_Error( 'rawatwp_core_single_child_only', __( 'Update core WordPress hanya boleh untuk 1 child per batch.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_core_single_child_only', __( 'WordPress core update can target only one child per batch.', 'rawatwp' ) );
 		}
 
 		$batch_id = 'batch-' . gmdate( 'YmdHis' ) . '-' . wp_generate_password( 8, false, false );
@@ -116,7 +116,7 @@ class QueueManager {
 					'package_id'   => (int) $package['id'],
 					'status'       => 'on_queue',
 					'progress'     => 0,
-					'message'      => 'Masuk antrian update.',
+					'message'      => 'Added to update queue.',
 					'reason_code'  => 'queued',
 					'attempts'     => 0,
 					'max_attempts' => self::MAX_ATTEMPTS,
@@ -133,7 +133,7 @@ class QueueManager {
 		}
 
 		if ( $queued <= 0 ) {
-			return new \WP_Error( 'rawatwp_queue_failed', __( 'Gagal memasukkan task ke queue.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_queue_failed', __( 'Failed to enqueue task.', 'rawatwp' ) );
 		}
 
 		$this->logger->log(
@@ -143,7 +143,7 @@ class QueueManager {
 				'status'    => 'on_queue',
 				'item_type' => $package['type'],
 				'item_slug' => $package['target_slug'],
-				'message'   => sprintf( 'Batch %s dibuat. %d site masuk antrian, %d dilewati.', $batch_id, $queued, $skipped ),
+				'message'   => sprintf( 'Batch %s created. %d site(s) queued, %d skipped.', $batch_id, $queued, $skipped ),
 				'context'   => array(
 					'batch_id' => $batch_id,
 					'queued'   => $queued,
@@ -302,8 +302,8 @@ class QueueManager {
 					'status'      => 'failed',
 					'progress'    => 100,
 					'reason_code' => 'invalid_target',
-					'message'     => 'Gagal: data site atau package tidak ditemukan.',
-					'last_error'  => 'Site/package tidak ditemukan saat diproses.',
+					'message'     => 'Failed: site or package data was not found.',
+					'last_error'  => 'Site/package not found while processing.',
 					'finished_at' => current_time( 'mysql' ),
 					'worker_id'   => null,
 				)
@@ -316,13 +316,13 @@ class QueueManager {
 			$queue_id,
 			array(
 				'progress' => 30,
-				'message'  => sprintf( 'Mengirim perintah update ke %s.', $site['site_name'] ),
+				'message'  => sprintf( 'Sending update command to %s.', $site['site_name'] ),
 			)
 		);
 
 		$dispatch = $this->master_manager->dispatch_package_to_site( $package, $site );
 		$status   = isset( $dispatch['status'] ) ? sanitize_key( $dispatch['status'] ) : 'failed';
-		$message  = isset( $dispatch['message'] ) ? sanitize_text_field( $dispatch['message'] ) : 'Tidak ada detail respons.';
+		$message  = isset( $dispatch['message'] ) ? sanitize_text_field( $dispatch['message'] ) : 'No response details.';
 
 		if ( 'update_success' === $status || 'success' === $status ) {
 			$this->database->update_queue_item(
@@ -358,7 +358,7 @@ class QueueManager {
 					'progress'    => 0,
 					'attempts'    => $attempts,
 					'reason_code' => $reason_code,
-					'message'     => sprintf( 'Gagal sementara: %s. Coba lagi %d/%d.', $message, $attempts + 1, $max_attempts ),
+					'message'     => sprintf( 'Temporary failure: %s. Retry %d/%d.', $message, $attempts + 1, $max_attempts ),
 					'last_error'  => $message,
 					'next_run_at' => $next_run_at,
 					'worker_id'   => null,
@@ -374,7 +374,7 @@ class QueueManager {
 				'progress'    => 100,
 				'attempts'    => $attempts,
 				'reason_code' => $reason_code,
-				'message'     => sprintf( 'Gagal update: %s', $message ),
+				'message'     => sprintf( 'Update failed: %s', $message ),
 				'last_error'  => $message,
 				'finished_at' => current_time( 'mysql' ),
 				'worker_id'   => null,

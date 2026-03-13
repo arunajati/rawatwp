@@ -127,7 +127,7 @@ class ChildManager {
 		$settings = $this->get_settings();
 
 		if ( '' === $settings['master_url'] || '' === $settings['security_key'] ) {
-			return new \WP_Error( 'rawatwp_missing_child_connection', __( 'Master URL dan security key wajib diisi.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_missing_child_connection', __( 'Master URL and security key are required.', 'rawatwp' ) );
 		}
 
 		$endpoint = untrailingslashit( $settings['master_url'] ) . '/wp-json/rawatwp/v1/master/register';
@@ -156,7 +156,7 @@ class ChildManager {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $body ) || empty( $body['status'] ) || 'connected' !== $body['status'] ) {
-			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Gagal connect ke Master.', 'rawatwp' );
+			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Failed to connect to Master.', 'rawatwp' );
 			return new \WP_Error( 'rawatwp_connect_failed', $message );
 		}
 
@@ -172,7 +172,7 @@ class ChildManager {
 				'site_url' => home_url(),
 				'action'   => 'connected',
 				'status'   => 'connected',
-				'message'  => 'Child terhubung ke master.',
+				'message'  => 'Child connected to master.',
 			)
 		);
 
@@ -198,7 +198,7 @@ class ChildManager {
 					'site_url' => home_url(),
 					'action'   => 'disconnected',
 					'status'   => 'disconnected',
-					'message'  => 'Child disconnect dari master (local).',
+					'message'  => 'Child disconnected from master (local).',
 				)
 			);
 		}
@@ -215,7 +215,7 @@ class ChildManager {
 		$settings = $this->get_settings();
 
 		if ( '' === $settings['master_url'] || '' === $settings['security_key'] ) {
-			return new \WP_Error( 'rawatwp_not_configured', __( 'Konfigurasi child belum lengkap.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_not_configured', __( 'Child configuration is incomplete.', 'rawatwp' ) );
 		}
 
 		$items = $this->monitored_items->get_needs_update_items();
@@ -247,7 +247,7 @@ class ChildManager {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $body ) || empty( $body['status'] ) || 'reported' !== $body['status'] ) {
-			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Laporan ke master gagal.', 'rawatwp' );
+			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Failed to send report to master.', 'rawatwp' );
 			return new \WP_Error( 'rawatwp_report_failed', $message );
 		}
 
@@ -257,7 +257,7 @@ class ChildManager {
 				'site_url' => home_url(),
 				'action'   => 'reported',
 				'status'   => 'reported',
-				'message'  => sprintf( 'Laporan needs-update terkirim (%d item).', count( $items ) ),
+				'message'  => sprintf( 'Needs-update report sent (%d item(s)).', count( $items ) ),
 			)
 		);
 
@@ -274,7 +274,7 @@ class ChildManager {
 		$settings = $this->get_settings();
 
 		if ( '' === $settings['master_url'] || '' === $settings['security_key'] ) {
-			return new \WP_Error( 'rawatwp_not_configured', __( 'Konfigurasi child belum lengkap.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_not_configured', __( 'Child configuration is incomplete.', 'rawatwp' ) );
 		}
 
 		$packet = $this->security->build_signed_packet(
@@ -303,7 +303,7 @@ class ChildManager {
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $body ) || empty( $body['status'] ) || 'ok' !== $body['status'] ) {
-			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Kirim log ke master gagal.', 'rawatwp' );
+			$message = isset( $body['message'] ) ? sanitize_text_field( $body['message'] ) : __( 'Failed to send logs to master.', 'rawatwp' );
 			return new \WP_Error( 'rawatwp_log_failed', $message );
 		}
 
@@ -318,17 +318,17 @@ class ChildManager {
 	 */
 	public function rest_apply_update( \WP_REST_Request $request ) {
 		if ( ! $this->mode_manager->is_child() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode bukan child.' ), 403 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not child.' ), 403 );
 		}
 
 		$settings = $this->get_settings();
 		if ( '' === $settings['security_key'] ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Security key child belum diset.' ), 400 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Child security key is not set.' ), 400 );
 		}
 
 		$packet       = $request->get_json_params();
 		if ( ! is_array( $packet ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Payload JSON tidak valid.' ), 400 );
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
 		}
 
 		$verification = $this->security->verify_signed_packet( $packet, $settings['security_key'], 'child_apply_update' );
@@ -357,7 +357,7 @@ class ChildManager {
 					'needs_update'    => true,
 				);
 			} else {
-				$message = 'Target tidak ditemukan di monitored items child.';
+				$message = 'Target not found in child monitored items.';
 				$this->logger->log(
 					array(
 						'mode'      => 'child',

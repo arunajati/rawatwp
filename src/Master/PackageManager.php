@@ -54,16 +54,16 @@ class PackageManager {
 	public function upload_package( array $file, array $meta = array() ) {
 
 		if ( empty( $file['name'] ) || empty( $file['tmp_name'] ) ) {
-			return new \WP_Error( 'rawatwp_no_file', __( 'File zip wajib dipilih.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_no_file', __( 'Zip file is required.', 'rawatwp' ) );
 		}
 
 		if ( ! isset( $file['error'] ) || 0 !== (int) $file['error'] ) {
-			return new \WP_Error( 'rawatwp_upload_error', __( 'Upload file gagal.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_upload_error', __( 'File upload failed.', 'rawatwp' ) );
 		}
 
 		$extension = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
 		if ( 'zip' !== $extension ) {
-			return new \WP_Error( 'rawatwp_not_zip', __( 'Hanya file zip yang diizinkan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_not_zip', __( 'Only zip files are allowed.', 'rawatwp' ) );
 		}
 
 		$packages_dir = $this->get_packages_directory();
@@ -80,7 +80,7 @@ class PackageManager {
 		$target_path = trailingslashit( $packages_dir ) . $target_file_name;
 		if ( ! @move_uploaded_file( $file['tmp_name'], $target_path ) ) {
 			if ( ! @copy( $file['tmp_name'], $target_path ) ) {
-				return new \WP_Error( 'rawatwp_move_failed', __( 'Gagal menyimpan file zip.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to save zip file.', 'rawatwp' ) );
 			}
 		}
 
@@ -98,7 +98,7 @@ class PackageManager {
 		$existing   = $this->database->get_package_by_hash( $hash );
 		if ( $existing ) {
 			@unlink( $target_path );
-			return new \WP_Error( 'rawatwp_package_duplicate', __( 'File zip ini sudah terdaftar.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_duplicate', __( 'This zip file is already registered.', 'rawatwp' ) );
 		}
 
 		$package_id = $this->database->insert_package(
@@ -114,7 +114,7 @@ class PackageManager {
 
 		if ( false === $package_id ) {
 			@unlink( $target_path );
-			return new \WP_Error( 'rawatwp_package_insert_failed', __( 'Gagal menyimpan metadata package.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_insert_failed', __( 'Failed to save package metadata.', 'rawatwp' ) );
 		}
 
 		$this->logger->log(
@@ -124,7 +124,7 @@ class PackageManager {
 				'status'    => 'success',
 				'item_type' => $type,
 				'item_slug' => $target_slug,
-				'message'   => sprintf( 'Package %s berhasil diupload.', $label ),
+				'message'   => sprintf( 'Package %s uploaded successfully.', $label ),
 				'context'   => array(
 					'package_id' => $package_id,
 				),
@@ -145,13 +145,13 @@ class PackageManager {
 		$packages_dir = $this->get_packages_directory();
 		if ( ! file_exists( $packages_dir ) ) {
 			if ( ! wp_mkdir_p( $packages_dir ) ) {
-				return new \WP_Error( 'rawatwp_updates_dir_missing', __( 'Folder updates tidak bisa dibuat.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_updates_dir_missing', __( 'Updates folder cannot be created.', 'rawatwp' ) );
 			}
 		}
 
 		$files = glob( trailingslashit( $packages_dir ) . '*.zip' );
 		if ( false === $files ) {
-			return new \WP_Error( 'rawatwp_scan_failed', __( 'Gagal membaca folder updates.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_scan_failed', __( 'Failed to read updates folder.', 'rawatwp' ) );
 		}
 
 		sort( $files );
@@ -172,7 +172,7 @@ class PackageManager {
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
 					'status' => 'failed',
-					'reason' => 'File tidak terbaca.',
+					'reason' => 'File cannot be read.',
 				);
 				continue;
 			}
@@ -183,7 +183,7 @@ class PackageManager {
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
 					'status' => 'failed',
-					'reason' => 'Gagal hitung hash file.',
+					'reason' => 'Failed to calculate file hash.',
 				);
 				continue;
 			}
@@ -236,7 +236,7 @@ class PackageManager {
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
 					'status' => 'failed',
-					'reason' => 'Gagal simpan metadata package.',
+					'reason' => 'Failed to save package metadata.',
 				);
 				continue;
 			}
@@ -256,7 +256,7 @@ class PackageManager {
 					'status'    => 'success',
 					'item_type' => $detected['type'],
 					'item_slug' => $detected['target_slug'],
-					'message'   => sprintf( 'Package dari folder updates diimport: %s', basename( $file_path ) ),
+					'message'   => sprintf( 'Package imported from updates folder: %s', basename( $file_path ) ),
 					'context'   => array(
 						'file_path' => $file_path,
 					),
@@ -295,12 +295,12 @@ class PackageManager {
 	public function delete_package( $package_id ) {
 		$package_id = (int) $package_id;
 		if ( $package_id <= 0 ) {
-			return new \WP_Error( 'rawatwp_bad_package_id', __( 'Package tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_package_id', __( 'Invalid package.', 'rawatwp' ) );
 		}
 
 		$package = $this->database->get_package_by_id( $package_id );
 		if ( ! $package ) {
-			return new \WP_Error( 'rawatwp_package_not_found', __( 'Package tidak ditemukan.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_not_found', __( 'Package not found.', 'rawatwp' ) );
 		}
 
 		$file_path      = isset( $package['file_path'] ) ? wp_normalize_path( (string) $package['file_path'] ) : '';
@@ -309,19 +309,19 @@ class PackageManager {
 
 		if ( '' !== $file_path && file_exists( $file_path ) && is_file( $file_path ) ) {
 			if ( ! $this->is_path_in_updates_dir( $file_path ) ) {
-				return new \WP_Error( 'rawatwp_package_path_invalid', __( 'Lokasi file package tidak valid untuk dihapus otomatis.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_package_path_invalid', __( 'Invalid package file location for auto delete.', 'rawatwp' ) );
 			}
 
 			$file_deleted   = @unlink( $file_path );
 			$file_delete_ok = $file_deleted;
 			if ( ! $file_delete_ok ) {
-				return new \WP_Error( 'rawatwp_package_file_delete_failed', __( 'Gagal menghapus file zip package.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_package_file_delete_failed', __( 'Failed to delete package zip file.', 'rawatwp' ) );
 			}
 		}
 
 		$deleted = $this->database->delete_package( $package_id );
 		if ( ! $deleted ) {
-			return new \WP_Error( 'rawatwp_package_delete_failed', __( 'Gagal menghapus data package dari database.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_package_delete_failed', __( 'Failed to delete package data from database.', 'rawatwp' ) );
 		}
 
 		$this->logger->log(
@@ -331,7 +331,7 @@ class PackageManager {
 					'status'    => 'success',
 				'item_type' => isset( $package['type'] ) ? $package['type'] : '',
 				'item_slug' => isset( $package['target_slug'] ) ? $package['target_slug'] : '',
-				'message'   => sprintf( 'Package dihapus: %s', isset( $package['file_name'] ) ? $package['file_name'] : (string) $package_id ),
+				'message'   => sprintf( 'Package deleted: %s', isset( $package['file_name'] ) ? $package['file_name'] : (string) $package_id ),
 				'context'   => array(
 					'package_id'     => $package_id,
 					'file_path'      => $file_path,
@@ -451,7 +451,7 @@ class PackageManager {
 		$label       = isset( $meta['label'] ) ? sanitize_text_field( $meta['label'] ) : '';
 
 		if ( ! in_array( $type, array( 'plugin', 'theme', 'core' ), true ) ) {
-			return new \WP_Error( 'rawatwp_unsupported_zip', __( 'zip tidak dikenali sebagai paket plugin, theme, atau core WordPress.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_unsupported_zip', __( 'Zip is not recognized as a plugin, theme, or WordPress core package.', 'rawatwp' ) );
 		}
 
 		if ( 'core' === $type && '' === $target_slug ) {
@@ -459,7 +459,7 @@ class PackageManager {
 		}
 
 		if ( '' === $target_slug ) {
-			return new \WP_Error( 'rawatwp_bad_slug', __( 'Target slug tidak bisa dideteksi otomatis.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_slug', __( 'Target slug cannot be auto-detected.', 'rawatwp' ) );
 		}
 
 		if ( '' === $label ) {
@@ -486,7 +486,7 @@ class PackageManager {
 	 */
 	private function inspect_zip_by_extraction( $zip_path ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
-			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive tidak tersedia di server.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive is not available on this server.', 'rawatwp' ) );
 		}
 
 		$temp_dir = $this->create_temp_inspect_dir();
@@ -497,14 +497,14 @@ class PackageManager {
 		$zip = new \ZipArchive();
 		if ( true !== $zip->open( $zip_path ) ) {
 			$this->remove_directory_recursive( $temp_dir );
-			return new \WP_Error( 'rawatwp_zip_open_failed', __( 'zip tidak bisa dibuka.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_zip_open_failed', __( 'Zip cannot be opened.', 'rawatwp' ) );
 		}
 
 		try {
 			for ( $index = 0; $index < $zip->numFiles; $index++ ) {
 				$stat = $zip->statIndex( $index );
 				if ( ! $stat || empty( $stat['name'] ) ) {
-					return new \WP_Error( 'rawatwp_zip_invalid_entry', __( 'Entry zip tidak valid.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_invalid_entry', __( 'Invalid zip entry.', 'rawatwp' ) );
 				}
 
 				$raw_name       = (string) $stat['name'];
@@ -517,42 +517,42 @@ class PackageManager {
 				}
 
 				if ( ! $this->is_safe_zip_entry( $entry_name ) ) {
-					return new \WP_Error( 'rawatwp_zip_traversal', __( 'zip mengandung path berbahaya.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_traversal', __( 'Zip contains unsafe path.', 'rawatwp' ) );
 				}
 
 				if ( isset( $stat['external_attributes'] ) ) {
 					$mode = ( $stat['external_attributes'] >> 16 ) & 0170000;
 					if ( 0120000 === $mode ) {
-						return new \WP_Error( 'rawatwp_zip_symlink', __( 'zip mengandung symlink yang tidak diizinkan.', 'rawatwp' ) );
+						return new \WP_Error( 'rawatwp_zip_symlink', __( 'Zip contains disallowed symlink.', 'rawatwp' ) );
 					}
 				}
 
 				$destination = wp_normalize_path( $temp_dir . '/' . $entry_name );
 				if ( ! $this->path_is_inside( $temp_dir, $destination ) ) {
-					return new \WP_Error( 'rawatwp_zip_traversal', __( 'zip mengandung path berbahaya.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_traversal', __( 'Zip contains unsafe path.', 'rawatwp' ) );
 				}
 
 				if ( $is_directory ) {
 					if ( ! file_exists( $destination ) && ! wp_mkdir_p( $destination ) ) {
-						return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Gagal membuat folder saat ekstrak zip.', 'rawatwp' ) );
+						return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Failed to create directory while extracting zip.', 'rawatwp' ) );
 					}
 					continue;
 				}
 
 				$parent = dirname( $destination );
 				if ( ! file_exists( $parent ) && ! wp_mkdir_p( $parent ) ) {
-					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Gagal membuat folder tujuan ekstrak zip.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Failed to create extraction target directory.', 'rawatwp' ) );
 				}
 
 				$stream = $zip->getStream( $raw_name );
 				if ( ! is_resource( $stream ) ) {
-					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Gagal membaca isi zip.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Failed to read zip content.', 'rawatwp' ) );
 				}
 
 				$out = fopen( $destination, 'wb' );
 				if ( false === $out ) {
 					fclose( $stream );
-					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Gagal menulis file hasil ekstrak.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Failed to write extracted file.', 'rawatwp' ) );
 				}
 
 				$copied = stream_copy_to_stream( $stream, $out );
@@ -560,7 +560,7 @@ class PackageManager {
 				fclose( $out );
 
 				if ( false === $copied ) {
-					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Gagal menyalin isi zip.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_extract_failed', __( 'Failed to copy zip content.', 'rawatwp' ) );
 				}
 			}
 
@@ -759,12 +759,12 @@ class PackageManager {
 		$temp_base  = wp_normalize_path( trailingslashit( $upload_dir['basedir'] ) . 'rawatwp/temp' );
 
 		if ( ! file_exists( $temp_base ) && ! wp_mkdir_p( $temp_base ) ) {
-			return new \WP_Error( 'rawatwp_temp_dir_missing', __( 'Folder temp tidak bisa dibuat.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_temp_dir_missing', __( 'Temp directory cannot be created.', 'rawatwp' ) );
 		}
 
 		$temp_dir = wp_normalize_path( trailingslashit( $temp_base ) . 'inspect-' . wp_generate_uuid4() );
 		if ( ! wp_mkdir_p( $temp_dir ) ) {
-			return new \WP_Error( 'rawatwp_temp_dir_missing', __( 'Folder kerja temp tidak bisa dibuat.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_temp_dir_missing', __( 'Temp work directory cannot be created.', 'rawatwp' ) );
 		}
 
 		return $temp_dir;
@@ -852,7 +852,7 @@ class PackageManager {
 	 */
 	private function validate_installable_structure_from_zip( $zip_path, $type, $target_slug ) {
 		if ( ! class_exists( 'ZipArchive' ) ) {
-			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive tidak tersedia di server.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive is not available on this server.', 'rawatwp' ) );
 		}
 
 		$type        = sanitize_key( $type );
@@ -860,7 +860,7 @@ class PackageManager {
 
 		$zip = new \ZipArchive();
 		if ( true !== $zip->open( $zip_path ) ) {
-			return new \WP_Error( 'rawatwp_zip_open_failed', __( 'zip tidak bisa dibuka.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_zip_open_failed', __( 'Zip cannot be opened.', 'rawatwp' ) );
 		}
 
 		$has_expected_entry = false;
@@ -916,7 +916,7 @@ class PackageManager {
 			if ( ! $has_expected_entry ) {
 				return new \WP_Error(
 					'rawatwp_zip_not_installable',
-					__( 'zip tidak cocok untuk instalasi/update WordPress. Gunakan file zip installer resmi plugin/theme/core.', 'rawatwp' )
+					__( 'Zip is not suitable for WordPress install/update. Use an official installable zip for plugin/theme/core.', 'rawatwp' )
 				);
 			}
 			return true;
@@ -925,10 +925,10 @@ class PackageManager {
 		if ( 'core' === $type ) {
 			return new \WP_Error(
 				'rawatwp_zip_not_installable',
-				__( 'zip core WordPress tidak valid untuk installer update.', 'rawatwp' )
+				__( 'WordPress core zip is invalid for updater installer.', 'rawatwp' )
 			);
 		}
 
-		return new \WP_Error( 'rawatwp_zip_not_installable', __( 'zip tidak installable oleh WordPress.', 'rawatwp' ) );
+		return new \WP_Error( 'rawatwp_zip_not_installable', __( 'Zip is not installable by WordPress.', 'rawatwp' ) );
 	}
 }

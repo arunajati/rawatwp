@@ -34,7 +34,7 @@ class MonitoredItemsManager {
 	public function add_item( array $item ) {
 		$type = sanitize_key( $item['type'] );
 		if ( ! in_array( $type, array( 'plugin', 'theme', 'core' ), true ) ) {
-			return new \WP_Error( 'rawatwp_bad_item_type', __( 'Type item tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_item_type', __( 'Invalid item type.', 'rawatwp' ) );
 		}
 
 		$slug = sanitize_title( $item['slug'] );
@@ -43,7 +43,7 @@ class MonitoredItemsManager {
 		}
 
 		if ( '' === $slug ) {
-			return new \WP_Error( 'rawatwp_bad_item_slug', __( 'Slug item wajib diisi.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_item_slug', __( 'Item slug is required.', 'rawatwp' ) );
 		}
 
 		$label = sanitize_text_field( $item['label'] );
@@ -58,7 +58,7 @@ class MonitoredItemsManager {
 
 		foreach ( $items as $existing ) {
 			if ( $existing['type'] === $type && $existing['slug'] === $slug ) {
-				return new \WP_Error( 'rawatwp_item_exists', __( 'Item sudah ada di daftar monitored.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_item_exists', __( 'Item already exists in monitored list.', 'rawatwp' ) );
 			}
 		}
 
