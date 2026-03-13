@@ -178,6 +178,7 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_bulk_delete_packages', array( $this, 'handle_bulk_delete_packages' ) );
 		add_action( 'admin_post_rawatwp_push_update', array( $this, 'handle_push_update' ) );
 		add_action( 'admin_post_rawatwp_clear_logs', array( $this, 'handle_clear_logs' ) );
+		add_action( 'admin_post_rawatwp_clear_update_progress', array( $this, 'handle_clear_update_progress' ) );
 		add_action( 'admin_post_rawatwp_check_update_now', array( $this, 'handle_check_update_now' ) );
 		add_action( 'admin_post_rawatwp_queue_run_now', array( $this, 'handle_queue_run_now' ) );
 		add_action( 'admin_post_rawatwp_queue_pause_toggle', array( $this, 'handle_queue_pause_toggle' ) );
@@ -1295,7 +1296,15 @@ class AdminPages {
 					</div>
 
 					<div class="rawatwp-card">
-						<h2>Update Progress</h2>
+						<div class="rawatwp-card-header">
+							<h2>Update Progress</h2>
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all completed update progress rows? Running queue items will stay untouched.');">
+								<?php wp_nonce_field( 'rawatwp_clear_update_progress' ); ?>
+								<input type="hidden" name="action" value="rawatwp_clear_update_progress" />
+								<?php submit_button( 'Clear Progress', 'secondary', 'submit', false ); ?>
+							</form>
+						</div>
+						<p class="description">Auto-clean is active: completed progress rows older than 30 days are removed, and total completed rows are capped at 10,000.</p>
 						<table class="widefat striped">
 						<thead>
 							<tr>
@@ -1997,6 +2006,26 @@ class AdminPages {
 		}
 
 		$this->redirect_with_notice( 'rawatwp-logs', 'Logs cleared successfully.', '' );
+	}
+
+	/**
+	 * Handle clear update progress action.
+	 *
+	 * @return void
+	 */
+	public function handle_clear_update_progress() {
+		$this->assert_admin_post( 'rawatwp_clear_update_progress' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'This feature is available only in Master mode.' );
+		}
+
+		$deleted = (int) $this->queue_manager->clear_finished_queue_history();
+		$this->redirect_with_notice(
+			'rawatwp-updates',
+			sprintf( 'Update progress cleared. Removed %d completed row(s).', $deleted ),
+			''
+		);
 	}
 
 	/**

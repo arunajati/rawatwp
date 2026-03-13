@@ -20,6 +20,11 @@ class QueueManager {
 	const OPTION_QUEUE_PAUSED = 'rawatwp_queue_paused';
 
 	/**
+	 * Queue maintenance timestamp option key.
+	 */
+	const OPTION_QUEUE_MAINTENANCE_LAST = 'rawatwp_queue_maintenance_last_run';
+
+	/**
 	 * Max retry count for transient errors.
 	 */
 	const MAX_ATTEMPTS = 3;
@@ -33,6 +38,13 @@ class QueueManager {
 	 * Delay seconds when a queue item must wait for previous item in same site batch.
 	 */
 	const PREDECESSOR_WAIT_SECONDS = 30;
+
+	/**
+	 * Queue maintenance defaults.
+	 */
+	const QUEUE_RETENTION_DAYS = 30;
+	const QUEUE_MAX_FINISHED_ROWS = 10000;
+	const QUEUE_MAINTENANCE_INTERVAL = 3600;
 
 	/**
 	 * Database.
@@ -213,6 +225,7 @@ class QueueManager {
 		$limit = max( 1, (int) $limit );
 
 		$this->logger->maybe_run_maintenance( 30, 10000, 3600 );
+		$this->maybe_run_queue_maintenance();
 
 		if ( $this->is_paused() ) {
 			return array(
@@ -324,6 +337,15 @@ class QueueManager {
 	 */
 	public function get_queue_counts() {
 		return $this->database->get_queue_counts();
+	}
+
+	/**
+	 * Clear finished queue history manually.
+	 *
+	 * @return int
+	 */
+	public function clear_finished_queue_history() {
+		return $this->database->clear_finished_queue_items();
 	}
 
 	/**
@@ -510,6 +532,23 @@ class QueueManager {
 	 */
 	private function unlock() {
 		delete_transient( self::LOCK_KEY );
+	}
+
+	/**
+	 * Auto-maintain queue history size.
+	 *
+	 * @return void
+	 */
+	private function maybe_run_queue_maintenance() {
+		$last_run = (int) get_option( self::OPTION_QUEUE_MAINTENANCE_LAST, 0 );
+		$now      = time();
+		if ( $last_run > 0 && ( $now - $last_run ) < self::QUEUE_MAINTENANCE_INTERVAL ) {
+			return;
+		}
+
+		$this->database->prune_finished_queue_older_than_days( self::QUEUE_RETENTION_DAYS );
+		$this->database->trim_finished_queue_to_max_rows( self::QUEUE_MAX_FINISHED_ROWS );
+		update_option( self::OPTION_QUEUE_MAINTENANCE_LAST, $now, false );
 	}
 
 	/**

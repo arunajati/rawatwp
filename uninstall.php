@@ -32,6 +32,7 @@ $options = array(
 	'rawatwp_delete_all_on_uninstall',
 	'rawatwp_schema_version',
 	'rawatwp_queue_paused',
+	'rawatwp_queue_maintenance_last_run',
 	'rawatwp_queue_runner_token',
 	'rawatwp_logs_last_maintenance',
 	'rawatwp_github_updater',

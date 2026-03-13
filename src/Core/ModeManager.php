@@ -102,6 +102,7 @@ class ModeManager {
 		if ( 'child' === $next_mode ) {
 			delete_option( 'rawatwp_master_settings' );
 			delete_option( 'rawatwp_queue_paused' );
+			delete_option( 'rawatwp_queue_maintenance_last_run' );
 		}
 	}
 }

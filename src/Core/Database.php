@@ -964,6 +964,89 @@ class Database {
 	}
 
 	/**
+	 * Clear completed queue history (success/failed).
+	 *
+	 * @return int Deleted rows.
+	 */
+	public function clear_finished_queue_items() {
+		global $wpdb;
+
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$this->table( 'queue' )} WHERE status IN (%s, %s)",
+				'success',
+				'failed'
+			)
+		);
+
+		return false === $deleted ? 0 : (int) $deleted;
+	}
+
+	/**
+	 * Prune completed queue rows older than N days.
+	 *
+	 * @param int $days Retention days.
+	 * @return int Deleted rows.
+	 */
+	public function prune_finished_queue_older_than_days( $days ) {
+		global $wpdb;
+
+		$days      = max( 1, (int) $days );
+		$threshold = wp_date( 'Y-m-d H:i:s', time() - ( $days * DAY_IN_SECONDS ), wp_timezone() );
+
+		$deleted = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$this->table( 'queue' )}
+				WHERE status IN (%s, %s)
+					AND COALESCE(finished_at, updated_at) < %s",
+				'success',
+				'failed',
+				$threshold
+			)
+		);
+
+		return false === $deleted ? 0 : (int) $deleted;
+	}
+
+	/**
+	 * Trim completed queue rows to max count (keeps newest).
+	 *
+	 * @param int $max_rows Max completed rows.
+	 * @return int Deleted rows.
+	 */
+	public function trim_finished_queue_to_max_rows( $max_rows ) {
+		global $wpdb;
+
+		$max_rows = max( 100, (int) $max_rows );
+		$total    = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(1) FROM {$this->table( 'queue' )} WHERE status IN (%s, %s)",
+				'success',
+				'failed'
+			)
+		);
+
+		if ( $total <= $max_rows ) {
+			return 0;
+		}
+
+		$delete_count = $total - $max_rows;
+		$deleted      = $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$this->table( 'queue' )}
+				WHERE status IN (%s, %s)
+				ORDER BY COALESCE(finished_at, updated_at) ASC, id ASC
+				LIMIT %d",
+				'success',
+				'failed',
+				$delete_count
+			)
+		);
+
+		return false === $deleted ? 0 : (int) $deleted;
+	}
+
+	/**
 	 * Prepare site row with decoded payload.
 	 *
 	 * @param array $row Raw row.
