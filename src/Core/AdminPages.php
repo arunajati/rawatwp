@@ -443,7 +443,7 @@ class AdminPages {
 								<input id="rawatwp-site-url" class="regular-text" type="url" name="site_url" required />
 							</p>
 						</div>
-						<?php submit_button( 'Add Child Site (Pre-register)' ); ?>
+						<?php submit_button( 'Add Child Site' ); ?>
 					</form>
 				</div>
 
@@ -571,7 +571,9 @@ class AdminPages {
 								<ul id="rawatwp-selected-files-list" class="rawatwp-selected-files-list"></ul>
 							</div>
 						</div>
-						<?php submit_button( 'Upload zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
+						<div class="rawatwp-upload-actions">
+							<?php submit_button( 'Upload zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
+						</div>
 					</form>
 
 					<div id="rawatwp-upload-monitor" class="rawatwp-upload-monitor" hidden>
@@ -630,7 +632,7 @@ class AdminPages {
 						<?php else : ?>
 							<?php foreach ( $packages as $package ) : ?>
 								<tr>
-									<td>
+									<td class="rawatwp-col-check">
 										<input
 											type="checkbox"
 											class="rawatwp-package-check"
@@ -1425,11 +1427,11 @@ class AdminPages {
 							<tr>
 								<td><?php echo esc_html( $this->format_datetime_for_display( isset( $log['created_at'] ) ? $log['created_at'] : '' ) ); ?></td>
 								<td><?php echo esc_html( $log['site_url'] ); ?></td>
-								<td><?php echo esc_html( $log['mode'] ); ?></td>
-								<td><?php echo esc_html( trim( $log['item_type'] . ':' . $log['item_slug'], ':' ) ); ?></td>
-								<td><?php echo esc_html( $log['action'] ); ?></td>
-								<td><?php echo esc_html( $log['status'] ); ?></td>
-								<td><?php echo esc_html( $log['message'] ); ?></td>
+								<td><?php echo esc_html( $this->format_log_mode_for_display( isset( $log['mode'] ) ? (string) $log['mode'] : '' ) ); ?></td>
+								<td><?php echo esc_html( $this->format_log_item_for_display( isset( $log['item_type'] ) ? (string) $log['item_type'] : '', isset( $log['item_slug'] ) ? (string) $log['item_slug'] : '' ) ); ?></td>
+								<td><?php echo esc_html( $this->format_log_action_for_display( isset( $log['action'] ) ? (string) $log['action'] : '' ) ); ?></td>
+								<td><?php echo esc_html( $this->format_log_status_for_display( isset( $log['status'] ) ? (string) $log['status'] : '' ) ); ?></td>
+								<td><?php echo esc_html( $this->format_log_message_for_display( $log ) ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
@@ -2160,6 +2162,316 @@ class AdminPages {
 			$skipped,
 			$failed
 		);
+	}
+
+	/**
+	 * Format log mode for UI.
+	 *
+	 * @param string $mode Raw mode.
+	 * @return string
+	 */
+	private function format_log_mode_for_display( $mode ) {
+		$mode = sanitize_key( (string) $mode );
+
+		$map = array(
+			'master' => 'Master',
+			'child'  => 'Child',
+		);
+
+		if ( isset( $map[ $mode ] ) ) {
+			return $map[ $mode ];
+		}
+
+		if ( '' === $mode ) {
+			return '-';
+		}
+
+		return ucwords( str_replace( '_', ' ', $mode ) );
+	}
+
+	/**
+	 * Format log item for UI.
+	 *
+	 * @param string $item_type Item type.
+	 * @param string $item_slug Item slug.
+	 * @return string
+	 */
+	private function format_log_item_for_display( $item_type, $item_slug ) {
+		$item_type = sanitize_key( (string) $item_type );
+		$item_slug = sanitize_title( (string) $item_slug );
+
+		$type_labels = array(
+			'plugin' => 'Plugin',
+			'theme'  => 'Theme',
+			'core'   => 'WordPress Core',
+		);
+
+		$type_label = isset( $type_labels[ $item_type ] ) ? $type_labels[ $item_type ] : '';
+		if ( 'core' === $item_type ) {
+			return 'WordPress Core';
+		}
+
+		$slug_label = $this->humanize_slug_for_display( $item_slug );
+
+		if ( '' === $type_label && '' === $slug_label ) {
+			return '-';
+		}
+
+		if ( '' === $type_label ) {
+			return $slug_label;
+		}
+
+		if ( '' === $slug_label ) {
+			return $type_label;
+		}
+
+		return $type_label . ': ' . $slug_label;
+	}
+
+	/**
+	 * Format log action for UI.
+	 *
+	 * @param string $action Raw action.
+	 * @return string
+	 */
+	private function format_log_action_for_display( $action ) {
+		$action = sanitize_key( (string) $action );
+		$map    = array(
+			'mode_switched'      => 'Mode Changed',
+			'site_preregistered' => 'Child Site Added',
+			'key_regenerated'    => 'Security Key Regenerated',
+			'connected'          => 'Connected',
+			'disconnected'       => 'Disconnected',
+			'reported'           => 'Update Report',
+			'package_uploaded'   => 'Package Uploaded',
+			'package_scanned'    => 'Package Imported',
+			'package_deleted'    => 'Package Deleted',
+			'package_upload_failed' => 'Package Upload Failed',
+			'queue_created'      => 'Queue Created',
+			'update_started'     => 'Update Started',
+			'update_result'      => 'Update Result',
+			'update_success'     => 'Update Succeeded',
+			'update_failed'      => 'Update Failed',
+			'rollback_started'   => 'Rollback Started',
+			'rollback_success'   => 'Rollback Succeeded',
+			'rollback_failed'    => 'Rollback Failed',
+			'event'              => 'Activity',
+		);
+
+		if ( isset( $map[ $action ] ) ) {
+			return $map[ $action ];
+		}
+
+		if ( '' === $action ) {
+			return '-';
+		}
+
+		return ucwords( str_replace( '_', ' ', $action ) );
+	}
+
+	/**
+	 * Format log status for UI.
+	 *
+	 * @param string $status Raw status.
+	 * @return string
+	 */
+	private function format_log_status_for_display( $status ) {
+		$status = sanitize_key( (string) $status );
+		$map    = array(
+			'ok'               => 'Success',
+			'success'          => 'Success',
+			'connected'        => 'Connected',
+			'disconnected'     => 'Disconnected',
+			'reported'         => 'Reported',
+			'on_queue'         => 'On Queue',
+			'processing'       => 'Processing',
+			'info'             => 'Info',
+			'update_started'   => 'In Progress',
+			'update_success'   => 'Success',
+			'update_failed'    => 'Failed',
+			'rollback_started' => 'In Progress',
+			'rollback_success' => 'Success',
+			'rollback_failed'  => 'Failed',
+			'rolled_back'      => 'Rolled Back',
+			'failed'           => 'Failed',
+			'skipped'          => 'Skipped',
+			'imported'         => 'Imported',
+		);
+
+		if ( isset( $map[ $status ] ) ) {
+			return $map[ $status ];
+		}
+
+		if ( '' === $status ) {
+			return '-';
+		}
+
+		return ucwords( str_replace( '_', ' ', $status ) );
+	}
+
+	/**
+	 * Format log message to a user-friendly sentence.
+	 *
+	 * @param array $log Log row.
+	 * @return string
+	 */
+	private function format_log_message_for_display( array $log ) {
+		$action  = isset( $log['action'] ) ? sanitize_key( (string) $log['action'] ) : '';
+		$status  = isset( $log['status'] ) ? sanitize_key( (string) $log['status'] ) : '';
+		$mode    = isset( $log['mode'] ) ? sanitize_key( (string) $log['mode'] ) : '';
+		$message = isset( $log['message'] ) ? sanitize_text_field( (string) $log['message'] ) : '';
+		$context = isset( $log['context'] ) && is_array( $log['context'] ) ? $log['context'] : array();
+
+		$message = trim( preg_replace( '/\s+/', ' ', $message ) );
+		if ( '' === $message ) {
+			return $this->build_human_friendly_fallback_message( $action, $status, $mode, $context );
+		}
+
+		$direct_map = array(
+			'Mode diubah ke master.'                        => 'Active mode changed to Master.',
+			'Mode diubah ke child.'                         => 'Active mode changed to Child.',
+			'Child site didaftarkan (pre-register).'        => 'Child site was added successfully.',
+			'Child site pre-registered.'                    => 'Child site was added successfully.',
+			'Security key child diganti.'                   => 'Child security key was regenerated.',
+			'Child connected successfully.'                 => 'Child site connected successfully.',
+			'Child connected to master.'                    => 'Child site connected to Master.',
+			'Child disconnected from master (local).'       => 'Child site was disconnected from Master.',
+			'Update started.'                               => 'Update has started.',
+			'Core update started.'                          => 'WordPress core update has started.',
+			'Rollback started.'                             => 'Automatic rollback started.',
+			'Rollback completed successfully.'              => 'Automatic rollback completed successfully.',
+			'Update push completed successfully.'           => 'Update completed successfully on child site.',
+			'Update push failed.'                           => 'Update failed on child site.',
+			'Failed to push update: child connection issue.' => 'Update failed: could not connect to child site.',
+			'No detailed response from child.'              => 'No detailed response was returned by child site.',
+			'Package upload URL is empty.'                  => 'Package link is missing.',
+			'Package download URL is empty.'                => 'Update package link is missing.',
+			'Update sukses melalui WP-native.'              => 'Update completed successfully using WordPress installer.',
+			'Update sukses melalui fallback replace.'       => 'Update completed successfully using safe fallback method.',
+			'Update sukses via WP-native.'                  => 'Update completed successfully using WordPress installer.',
+			'Update sukses via fallback replace.'           => 'Update completed successfully using safe fallback method.',
+		);
+
+		if ( isset( $direct_map[ $message ] ) ) {
+			return $direct_map[ $message ];
+		}
+
+		if ( false !== stripos( $message, 'critical error on this website' ) ) {
+			return 'Update failed because the child site encountered a critical error.';
+		}
+
+		if ( false !== stripos( $message, 'Child update exception:' ) ) {
+			return 'Update failed due to an unexpected error on child site.';
+		}
+
+		if ( false !== stripos( $message, 'WP-native exception:' ) ) {
+			return 'WordPress installer failed, then safe fallback was attempted.';
+		}
+
+		if ( false !== stripos( $message, '| Rollback failed.' ) ) {
+			return 'Update failed and automatic rollback also failed. Please check child site immediately.';
+		}
+
+		if ( false !== stripos( $message, '| Rollback completed successfully.' ) ) {
+			return 'Update failed, but automatic rollback restored the previous version.';
+		}
+
+		if ( 'update_result' === $action ) {
+			return $this->build_human_friendly_fallback_message( $action, $status, $mode, $context );
+		}
+
+		return $message;
+	}
+
+	/**
+	 * Build fallback user-facing message when raw message is empty/technical.
+	 *
+	 * @param string $action Action key.
+	 * @param string $status Status key.
+	 * @param string $mode Mode key.
+	 * @param array  $context Context map.
+	 * @return string
+	 */
+	private function build_human_friendly_fallback_message( $action, $status, $mode, array $context ) {
+		if ( 'update_result' === $action ) {
+			if ( in_array( $status, array( 'update_success', 'success', 'ok' ), true ) ) {
+				return 'Update completed successfully on child site.';
+			}
+
+			$reason_code = isset( $context['reason_code'] ) ? sanitize_key( (string) $context['reason_code'] ) : '';
+			$detail      = isset( $context['detail'] ) ? sanitize_text_field( (string) $context['detail'] ) : '';
+			$reason_map  = array(
+				'network_error'          => 'Update failed: could not connect to child site.',
+				'remote_temporary_error' => 'Update failed temporarily because of network/server issue.',
+				'remote_request_rejected' => 'Update request was rejected by child site.',
+				'child_update_failed'    => 'Child site reported update failure.',
+				'update_failed'          => 'Update failed on child site.',
+			);
+
+			$base = isset( $reason_map[ $reason_code ] ) ? $reason_map[ $reason_code ] : 'Update failed on child site.';
+			if ( '' !== $detail ) {
+				if ( false !== stripos( $detail, 'critical error on this website' ) ) {
+					return 'Update failed because the child site encountered a critical error.';
+				}
+
+				return $base . ' Detail: ' . $detail;
+			}
+
+			return $base;
+		}
+
+		if ( 'reported' === $action ) {
+			return 'child' === $mode ? 'Update report sent to Master.' : 'Update report received from child site.';
+		}
+
+		if ( 'queue_created' === $action ) {
+			$queued  = isset( $context['queued'] ) ? (int) $context['queued'] : 0;
+			$skipped = isset( $context['skipped'] ) ? (int) $context['skipped'] : 0;
+			return sprintf( 'Update queue created: %d site(s) ready, %d skipped.', $queued, $skipped );
+		}
+
+		$map = array(
+			'mode_switched'      => 'Active mode was updated.',
+			'site_preregistered' => 'Child site was added successfully.',
+			'key_regenerated'    => 'Security key was regenerated.',
+			'connected'          => 'Connection established.',
+			'disconnected'       => 'Connection disconnected.',
+			'package_uploaded'   => 'Package uploaded successfully.',
+			'package_scanned'    => 'Package imported from updates folder.',
+			'package_deleted'    => 'Package deleted successfully.',
+			'package_upload_failed' => 'Package upload failed.',
+			'update_started'     => 'Update has started.',
+			'update_success'     => 'Update completed successfully.',
+			'update_failed'      => 'Update failed.',
+			'rollback_started'   => 'Automatic rollback started.',
+			'rollback_success'   => 'Automatic rollback completed successfully.',
+			'rollback_failed'    => 'Automatic rollback failed.',
+		);
+
+		if ( isset( $map[ $action ] ) ) {
+			return $map[ $action ];
+		}
+
+		return 'RawatWP activity recorded.';
+	}
+
+	/**
+	 * Humanize slug-like values for display.
+	 *
+	 * @param string $slug Slug.
+	 * @return string
+	 */
+	private function humanize_slug_for_display( $slug ) {
+		$slug = sanitize_text_field( (string) $slug );
+		if ( '' === $slug ) {
+			return '';
+		}
+
+		$slug = str_replace( array( '-', '_' ), ' ', $slug );
+		$slug = preg_replace( '/\s+/', ' ', (string) $slug );
+		$slug = trim( (string) $slug );
+
+		return ucwords( $slug );
 	}
 
 	/**

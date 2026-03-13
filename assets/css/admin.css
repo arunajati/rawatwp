@@ -196,6 +196,10 @@
 	margin-bottom: var(--rawatwp-space-1);
 }
 
+.rawatwp-admin .rawatwp-upload-actions {
+	margin-top: var(--rawatwp-space-2);
+}
+
 .rawatwp-admin .rawatwp-selected-files {
 	margin-top: var(--rawatwp-space-1);
 	border: 1px solid #dcdcde;
@@ -476,6 +480,21 @@
 
 .rawatwp-admin .rawatwp-col-check {
 	width: 40px;
+}
+
+.rawatwp-admin .rawatwp-package-table th.rawatwp-col-check,
+.rawatwp-admin .rawatwp-package-table td.rawatwp-col-check {
+	width: 44px;
+	text-align: center;
+	padding-left: 8px;
+	padding-right: 8px;
+}
+
+.rawatwp-admin .rawatwp-package-table td.rawatwp-col-check input[type="checkbox"],
+.rawatwp-admin .rawatwp-package-table th.rawatwp-col-check input[type="checkbox"] {
+	display: inline-block;
+	margin: 0;
+	vertical-align: middle;
 }
 
 .rawatwp-admin .rawatwp-select-all-sites {
