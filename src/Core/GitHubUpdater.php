@@ -394,7 +394,7 @@ class GitHubUpdater {
 		$version     = ltrim( $tag, "vV \t\n\r\0\x0B" );
 		$package_url = $this->pick_release_asset_url( $body );
 		if ( '' === $package_url ) {
-			return new \WP_Error( 'rawatwp_gh_no_asset', 'Release wajib punya asset ZIP installable, misalnya rawatwp-0.1.19.zip.' );
+			return new \WP_Error( 'rawatwp_gh_no_asset', 'Release wajib punya asset zip installable, misalnya rawatwp-0.1.19.zip.' );
 		}
 
 		$release = array(
@@ -412,7 +412,7 @@ class GitHubUpdater {
 	}
 
 	/**
-	 * Select release asset ZIP URL.
+	 * Select release asset zip URL.
 	 *
 	 * @param array $release GitHub release payload.
 	 * @return string

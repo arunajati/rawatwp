@@ -265,11 +265,6 @@ class AdminPages {
 					<?php submit_button( 'Simpan Pengaturan' ); ?>
 				</form>
 
-				<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-					<?php wp_nonce_field( 'rawatwp_check_update_now' ); ?>
-					<input type="hidden" name="action" value="rawatwp_check_update_now" />
-					<?php submit_button( 'Check Update', 'secondary', 'submit', false ); ?>
-				</form>
 			</div>
 		</div>
 		<?php
@@ -442,16 +437,16 @@ class AdminPages {
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_add_site' ); ?>
 						<input type="hidden" name="action" value="rawatwp_add_site" />
-						<table class="form-table" role="presentation">
-							<tr>
-								<th scope="row">Nama Site Child</th>
-								<td><input class="regular-text" type="text" name="site_name" required /></td>
-							</tr>
-							<tr>
-								<th scope="row">Domain / URL Child</th>
-								<td><input class="regular-text" type="url" name="site_url" required /></td>
-							</tr>
-						</table>
+						<div class="rawatwp-field-stack">
+							<p class="rawatwp-field-group">
+								<label for="rawatwp-site-name"><strong>Nama Site Child</strong></label>
+								<input id="rawatwp-site-name" class="regular-text" type="text" name="site_name" required />
+							</p>
+							<p class="rawatwp-field-group">
+								<label for="rawatwp-site-url"><strong>Domain / URL Child</strong></label>
+								<input id="rawatwp-site-url" class="regular-text" type="url" name="site_url" required />
+							</p>
+						</div>
 						<?php submit_button( 'Tambah Child Site (Pre-register)' ); ?>
 					</form>
 				</div>
@@ -570,7 +565,7 @@ class AdminPages {
 						<input type="hidden" name="action" value="rawatwp_upload_package" />
 						<table class="form-table" role="presentation">
 							<tr>
-								<th scope="row">File ZIP</th>
+								<th scope="row">File zip</th>
 								<td>
 									<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 									<p id="rawatwp-upload-file-count" class="description"></p>
@@ -580,10 +575,10 @@ class AdminPages {
 								</td>
 							</tr>
 						</table>
-						<?php submit_button( 'Upload Package ZIP', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
+						<?php submit_button( 'Upload package zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
 					</form>
 
-					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<form class="rawatwp-inline-form rawatwp-package-scan-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
 						<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
 						<?php submit_button( 'Scan Available Packages', 'secondary', 'submit', false ); ?>
@@ -592,7 +587,7 @@ class AdminPages {
 
 				<div class="rawatwp-card">
 					<h2>Daftar Package</h2>
-					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File ZIP dan data package akan dihapus permanen.');">
+					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus semua package terpilih? File zip dan data package akan dihapus permanen.');">
 						<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
 						<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
 						<select name="bulk_action" required>
@@ -642,7 +637,7 @@ class AdminPages {
 									<td><?php echo esc_html( $package['file_name'] ); ?></td>
 									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $package['created_at'] ) ? $package['created_at'] : '' ) ); ?></td>
 									<td>
-										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus package ini? File ZIP dan data package akan dihapus permanen.');">
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Hapus package ini? File zip dan data package akan dihapus permanen.');">
 											<?php wp_nonce_field( 'rawatwp_delete_package' ); ?>
 											<input type="hidden" name="action" value="rawatwp_delete_package" />
 											<input type="hidden" name="package_id" value="<?php echo esc_attr( (string) $package['id'] ); ?>" />
@@ -878,12 +873,12 @@ class AdminPages {
 											?>
 											<label class="rawatwp-updates-site-item">
 												<input class="rawatwp-site-check" type="checkbox" name="site_ids[]" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
-												<?php echo esc_html( $site['site_name'] . ' (' . $site_url . ')' ); ?>
+												<span class="rawatwp-updates-site-name"><?php echo esc_html( $site['site_name'] . ' (' . $site_url . ')' ); ?></span>
 												<span class="rawatwp-updates-site-meta">
 													<?php
 													echo esc_html(
 														sprintf(
-															' | Status: %s | Butuh update: %d item',
+															'Status: %s | Butuh update: %d item',
 															isset( $site['connection_status'] ) ? (string) $site['connection_status'] : '-',
 															$needs_count
 														)
@@ -1037,11 +1032,6 @@ class AdminPages {
 			<?php $this->render_notices(); ?>
 			<div class="rawatwp-card">
 				<p>Log otomatis dirawat: hapus data lebih dari 30 hari dan batasi maksimal 10.000 baris terbaru agar database tetap ringan.</p>
-				<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear semua log RawatWP?');">
-					<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
-					<input type="hidden" name="action" value="rawatwp_clear_logs" />
-					<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
-				</form>
 				<table class="widefat striped">
 					<thead>
 						<tr>
@@ -1068,6 +1058,13 @@ class AdminPages {
 						<?php endforeach; ?>
 					</tbody>
 				</table>
+				<div class="rawatwp-log-actions">
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear semua log RawatWP?');">
+						<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
+						<input type="hidden" name="action" value="rawatwp_clear_logs" />
+						<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
+					</form>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -1285,7 +1282,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_upload_package' );
 
 		if ( empty( $_FILES['package_zip'] ) || ! is_array( $_FILES['package_zip'] ) ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'File ZIP tidak ditemukan.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'File zip tidak ditemukan.' );
 		}
 
 		$uploaded = $_FILES['package_zip'];
@@ -1309,7 +1306,7 @@ class AdminPages {
 		}
 
 		if ( empty( $files ) ) {
-			$this->redirect_with_notice( 'rawatwp-packages', '', 'Tidak ada file ZIP yang dipilih.' );
+			$this->redirect_with_notice( 'rawatwp-packages', '', 'Tidak ada file zip yang dipilih.' );
 		}
 
 		$success = 0;
@@ -1336,7 +1333,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-packages', '', $error );
 		}
 
-		$this->redirect_with_notice( 'rawatwp-packages', sprintf( '%d file ZIP berhasil diupload.', $success ), '' );
+		$this->redirect_with_notice( 'rawatwp-packages', sprintf( '%d file zip berhasil diupload.', $success ), '' );
 	}
 
 	/**
@@ -1357,7 +1354,7 @@ class AdminPages {
 		}
 
 		$message = sprintf(
-			'Scan folder selesai. Total ZIP: %d, Import: %d, Skip: %d, Gagal: %d.',
+			'Scan folder selesai. Total zip: %d, Import: %d, Skip: %d, Gagal: %d.',
 			(int) $result['total'],
 			(int) $result['imported'],
 			(int) $result['skipped'],

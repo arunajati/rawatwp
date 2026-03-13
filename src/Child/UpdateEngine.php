@@ -196,7 +196,7 @@ class UpdateEngine {
 			} else {
 				$wp_native_result = new \WP_Error(
 					'rawatwp_native_mismatch',
-					'Struktur ZIP tidak cocok untuk update native, fallback dijalankan agar update tetap ke slug target.'
+					'Struktur zip tidak cocok untuk update native, fallback dijalankan agar update tetap ke slug target.'
 				);
 			}
 		}
@@ -294,7 +294,7 @@ class UpdateEngine {
 	}
 
 	/**
-	 * Download package ZIP to temporary file.
+	 * Download package zip to temporary file.
 	 *
 	 * @param string $download_url Package URL.
 	 * @return string|\WP_Error
@@ -311,7 +311,7 @@ class UpdateEngine {
 	}
 
 	/**
-	 * Apply WordPress core update from ZIP using native core upgrader.
+	 * Apply WordPress core update from zip using native core upgrader.
 	 *
 	 * @param array  $item Item info.
 	 * @param string $download_url Signed package URL.
@@ -385,7 +385,7 @@ class UpdateEngine {
 	 * Try update using native WordPress upgrader.
 	 *
 	 * @param string $type Item type.
-	 * @param string $zip_path Local ZIP path.
+	 * @param string $zip_path Local zip path.
 	 * @return true|\WP_Error
 	 */
 	private function apply_wp_native( $type, $zip_path ) {
@@ -455,7 +455,7 @@ class UpdateEngine {
 	/**
 	 * Fallback update by copy/replace files into target folder.
 	 *
-	 * @param string $zip_path ZIP path.
+	 * @param string $zip_path zip path.
 	 * @param string $target_path Destination path.
 	 * @param string $target_slug Target slug.
 	 * @param string $target_type Target type.
@@ -520,9 +520,9 @@ class UpdateEngine {
 	}
 
 	/**
-	 * Validate ZIP for traversal and symlink.
+	 * Validate zip for traversal and symlink.
 	 *
-	 * @param string $zip_path ZIP path.
+	 * @param string $zip_path zip path.
 	 * @return true|\WP_Error
 	 */
 	private function validate_zip( $zip_path ) {
@@ -532,27 +532,27 @@ class UpdateEngine {
 
 		$zip = new \ZipArchive();
 		if ( true !== $zip->open( $zip_path ) ) {
-			return new \WP_Error( 'rawatwp_bad_zip', __( 'ZIP tidak valid.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_bad_zip', __( 'zip tidak valid.', 'rawatwp' ) );
 		}
 
 		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
 			$stat = $zip->statIndex( $index );
 			if ( ! $stat || empty( $stat['name'] ) ) {
 				$zip->close();
-				return new \WP_Error( 'rawatwp_bad_zip_entry', __( 'Entry ZIP tidak valid.', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_bad_zip_entry', __( 'Entry zip tidak valid.', 'rawatwp' ) );
 			}
 
 			$name = (string) $stat['name'];
 			if ( false !== strpos( $name, '../' ) || false !== strpos( $name, '..\\' ) || preg_match( '#^([a-zA-Z]:|/)#', $name ) ) {
 				$zip->close();
-				return new \WP_Error( 'rawatwp_zip_path_attack', __( 'ZIP berbahaya (path traversal).', 'rawatwp' ) );
+				return new \WP_Error( 'rawatwp_zip_path_attack', __( 'zip berbahaya (path traversal).', 'rawatwp' ) );
 			}
 
 			if ( isset( $stat['external_attributes'] ) ) {
 				$mode = ( $stat['external_attributes'] >> 16 ) & 0170000;
 				if ( 0120000 === $mode ) {
 					$zip->close();
-					return new \WP_Error( 'rawatwp_zip_symlink', __( 'ZIP berisi symlink dan ditolak.', 'rawatwp' ) );
+					return new \WP_Error( 'rawatwp_zip_symlink', __( 'zip berisi symlink dan ditolak.', 'rawatwp' ) );
 				}
 			}
 		}
@@ -563,7 +563,7 @@ class UpdateEngine {
 	}
 
 	/**
-	 * Resolve best source root from extracted ZIP content.
+	 * Resolve best source root from extracted zip content.
 	 *
 	 * @param string $extract_dir Extraction directory.
 	 * @param string $target_slug Target slug.
@@ -619,7 +619,7 @@ class UpdateEngine {
 		);
 
 		if ( empty( $entries ) ) {
-			return new \WP_Error( 'rawatwp_empty_extract', __( 'Isi ZIP kosong.', 'rawatwp' ) );
+			return new \WP_Error( 'rawatwp_empty_extract', __( 'Isi zip kosong.', 'rawatwp' ) );
 		}
 
 		$slug_path = $extract_dir . '/' . $target_slug;
@@ -640,7 +640,7 @@ class UpdateEngine {
 	/**
 	 * Check whether WP-native installer is safe to use for this target.
 	 *
-	 * @param string $zip_path ZIP path.
+	 * @param string $zip_path zip path.
 	 * @param array  $item Target item.
 	 * @return bool
 	 */
