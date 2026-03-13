@@ -445,6 +445,85 @@ class ChildManager {
 	}
 
 	/**
+	 * REST: check available WordPress updates on child site.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response
+	 */
+	public function rest_check_updates( \WP_REST_Request $request ) {
+		if ( ! $this->mode_manager->is_child() ) {
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not child.' ), 403 );
+		}
+
+		$settings = $this->get_settings();
+		if ( '' === $settings['security_key'] ) {
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Child security key is not set.' ), 400 );
+		}
+
+		$packet = $request->get_json_params();
+		if ( ! is_array( $packet ) ) {
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
+		}
+
+		$verification = $this->security->verify_signed_packet( $packet, $settings['security_key'], 'child_check_updates' );
+		if ( is_wp_error( $verification ) ) {
+			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => $verification->get_error_message() ), 403 );
+		}
+
+		$data          = isset( $packet['data'] ) && is_array( $packet['data'] ) ? $packet['data'] : array();
+		$force_refresh = ! empty( $data['force_refresh'] );
+		$snapshot      = $this->collect_wp_updates_snapshot( $force_refresh );
+
+		if ( is_wp_error( $snapshot ) ) {
+			$this->logger->log(
+				array(
+					'mode'     => 'child',
+					'site_url' => home_url(),
+					'action'   => 'update_check_failed',
+					'status'   => 'failed',
+					'message'  => 'Manual update check failed on child site.',
+					'context'  => array(
+						'detail' => $snapshot->get_error_message(),
+					),
+				)
+			);
+
+			return new \WP_REST_Response(
+				array(
+					'status'  => 'failed',
+					'message' => 'Failed to check available updates on child site.',
+				),
+				500
+			);
+		}
+
+		$this->logger->log(
+			array(
+				'mode'     => 'child',
+				'site_url' => home_url(),
+				'action'   => 'update_check_success',
+				'status'   => 'success',
+				'message'  => sprintf(
+					'Manual update check completed. Core: %s, Themes: %d, Plugins: %d.',
+					! empty( $snapshot['core']['needs_update'] ) ? 'needs update' : 'up to date',
+					isset( $snapshot['counts']['themes'] ) ? (int) $snapshot['counts']['themes'] : 0,
+					isset( $snapshot['counts']['plugins'] ) ? (int) $snapshot['counts']['plugins'] : 0
+				),
+			)
+		);
+
+		return new \WP_REST_Response(
+			array(
+				'status'          => 'ok',
+				'message'         => 'Update check completed.',
+				'rawatwp_version' => $this->get_local_rawatwp_version(),
+				'updates'         => $snapshot,
+			),
+			200
+		);
+	}
+
+	/**
 	 * Get local RawatWP version.
 	 *
 	 * @return string
@@ -454,5 +533,152 @@ class ChildManager {
 		$version = preg_replace( '/[^0-9A-Za-z.\-+]/', '', $version );
 
 		return sanitize_text_field( (string) $version );
+	}
+
+	/**
+	 * Collect update availability snapshot for core/themes/plugins.
+	 *
+	 * @param bool $force_refresh True to force refresh from WordPress update source.
+	 * @return array|\WP_Error
+	 */
+	private function collect_wp_updates_snapshot( $force_refresh = true ) {
+		if ( ! function_exists( 'wp_update_plugins' ) || ! function_exists( 'wp_update_themes' ) || ! function_exists( 'wp_version_check' ) ) {
+			require_once ABSPATH . 'wp-includes/update.php';
+		}
+		if ( ! function_exists( 'get_core_updates' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/update.php';
+		}
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		if ( $force_refresh ) {
+			wp_version_check( array(), true );
+			wp_update_plugins();
+			wp_update_themes();
+		}
+
+		$current_wp_version = sanitize_text_field( (string) get_bloginfo( 'version' ) );
+		$core_updates       = function_exists( 'get_core_updates' ) ? get_core_updates( array( 'dismissed' => false ) ) : array();
+		$core_needs_update  = false;
+		$core_latest        = $current_wp_version;
+		if ( is_array( $core_updates ) ) {
+			foreach ( $core_updates as $core_update ) {
+				if ( ! is_object( $core_update ) ) {
+					continue;
+				}
+				$response = isset( $core_update->response ) ? sanitize_key( (string) $core_update->response ) : '';
+				$version  = isset( $core_update->current ) ? sanitize_text_field( (string) $core_update->current ) : '';
+				if ( 'upgrade' === $response && '' !== $version ) {
+					$core_needs_update = true;
+					$core_latest       = $version;
+					break;
+				}
+			}
+		}
+
+		$plugin_updates = array();
+		$plugins_data   = get_plugins();
+		$plugin_tx      = get_site_transient( 'update_plugins' );
+		$plugin_resp    = ( is_object( $plugin_tx ) && isset( $plugin_tx->response ) && is_array( $plugin_tx->response ) ) ? $plugin_tx->response : array();
+
+		foreach ( $plugin_resp as $plugin_file => $info ) {
+			$plugin_file = sanitize_text_field( (string) $plugin_file );
+			$slug        = '';
+			$new_version = '';
+
+			if ( is_object( $info ) ) {
+				$slug        = isset( $info->slug ) ? sanitize_key( (string) $info->slug ) : '';
+				$new_version = isset( $info->new_version ) ? sanitize_text_field( (string) $info->new_version ) : '';
+			} elseif ( is_array( $info ) ) {
+				$slug        = isset( $info['slug'] ) ? sanitize_key( (string) $info['slug'] ) : '';
+				$new_version = isset( $info['new_version'] ) ? sanitize_text_field( (string) $info['new_version'] ) : '';
+			}
+
+			if ( '' === $slug ) {
+				$folder_slug = dirname( $plugin_file );
+				$slug        = '.' !== $folder_slug ? sanitize_key( (string) $folder_slug ) : sanitize_key( basename( $plugin_file, '.php' ) );
+			}
+
+			$current_version = '';
+			$name            = '';
+			if ( isset( $plugins_data[ $plugin_file ] ) && is_array( $plugins_data[ $plugin_file ] ) ) {
+				$current_version = isset( $plugins_data[ $plugin_file ]['Version'] ) ? sanitize_text_field( (string) $plugins_data[ $plugin_file ]['Version'] ) : '';
+				$name            = isset( $plugins_data[ $plugin_file ]['Name'] ) ? sanitize_text_field( (string) $plugins_data[ $plugin_file ]['Name'] ) : '';
+			}
+
+			if ( '' === $name ) {
+				$name = ucwords( str_replace( array( '-', '_' ), ' ', $slug ) );
+			}
+
+			$plugin_updates[] = array(
+				'slug'            => $slug,
+				'name'            => $name,
+				'current_version' => $current_version,
+				'new_version'     => $new_version,
+			);
+		}
+
+		$theme_updates = array();
+		$themes_data   = wp_get_themes();
+		$theme_tx      = get_site_transient( 'update_themes' );
+		$theme_resp    = ( is_object( $theme_tx ) && isset( $theme_tx->response ) && is_array( $theme_tx->response ) ) ? $theme_tx->response : array();
+
+		foreach ( $theme_resp as $stylesheet => $info ) {
+			$stylesheet = sanitize_key( (string) $stylesheet );
+			if ( '' === $stylesheet ) {
+				continue;
+			}
+
+			$new_version = '';
+			if ( is_array( $info ) ) {
+				$new_version = isset( $info['new_version'] ) ? sanitize_text_field( (string) $info['new_version'] ) : '';
+			} elseif ( is_object( $info ) ) {
+				$new_version = isset( $info->new_version ) ? sanitize_text_field( (string) $info->new_version ) : '';
+			}
+
+			$theme_obj        = isset( $themes_data[ $stylesheet ] ) ? $themes_data[ $stylesheet ] : null;
+			$current_version  = $theme_obj ? sanitize_text_field( (string) $theme_obj->get( 'Version' ) ) : '';
+			$name             = $theme_obj ? sanitize_text_field( (string) $theme_obj->get( 'Name' ) ) : ucwords( str_replace( array( '-', '_' ), ' ', $stylesheet ) );
+
+			$theme_updates[] = array(
+				'slug'            => $stylesheet,
+				'name'            => $name,
+				'current_version' => $current_version,
+				'new_version'     => $new_version,
+			);
+		}
+
+		usort(
+			$plugin_updates,
+			static function( $a, $b ) {
+				return strcasecmp( (string) $a['name'], (string) $b['name'] );
+			}
+		);
+		usort(
+			$theme_updates,
+			static function( $a, $b ) {
+				return strcasecmp( (string) $a['name'], (string) $b['name'] );
+			}
+		);
+
+		$core_count = $core_needs_update ? 1 : 0;
+
+		return array(
+			'checked_at' => current_time( 'mysql' ),
+			'core'       => array(
+				'needs_update'    => $core_needs_update,
+				'current_version' => $current_wp_version,
+				'latest_version'  => $core_latest,
+			),
+			'themes'     => $theme_updates,
+			'plugins'    => $plugin_updates,
+			'counts'     => array(
+				'core'    => $core_count,
+				'themes'  => count( $theme_updates ),
+				'plugins' => count( $plugin_updates ),
+				'total'   => $core_count + count( $theme_updates ) + count( $plugin_updates ),
+			),
+		);
 	}
 }

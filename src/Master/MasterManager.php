@@ -191,6 +191,175 @@ class MasterManager {
 	}
 
 	/**
+	 * Request WordPress update snapshot from one child site.
+	 *
+	 * @param int $site_id Child site ID.
+	 * @return array|\WP_Error
+	 */
+	public function request_site_updates_snapshot( $site_id ) {
+		$site_id = (int) $site_id;
+		$site    = $this->database->get_site_by_id( $site_id );
+		if ( ! $site ) {
+			return new \WP_Error( 'rawatwp_site_not_found', __( 'Site not found.', 'rawatwp' ) );
+		}
+
+		if ( 'connected' !== sanitize_key( (string) $site['connection_status'] ) ) {
+			return new \WP_Error( 'rawatwp_site_not_connected', __( 'Child site is not connected.', 'rawatwp' ) );
+		}
+
+		$this->logger->log(
+			array(
+				'mode'     => 'master',
+				'site_url' => $site['site_url'],
+				'action'   => 'update_check_started',
+				'status'   => 'processing',
+				'message'  => 'Manual update check started for child site.',
+			)
+		);
+
+		$endpoint = untrailingslashit( $site['site_url'] ) . '/wp-json/rawatwp/v1/child/check-updates';
+		$packet   = $this->security->build_signed_packet(
+			array(
+				'site_url'       => home_url(),
+				'force_refresh'  => true,
+				'request_source' => 'master_manual',
+			),
+			$site['security_key']
+		);
+
+		$response = wp_remote_post(
+			$endpoint,
+			array(
+				'timeout' => 120,
+				'headers' => array(
+					'Content-Type' => 'application/json',
+				),
+				'body'    => wp_json_encode( $packet ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			$this->logger->log(
+				array(
+					'mode'     => 'master',
+					'site_url' => $site['site_url'],
+					'action'   => 'update_check_failed',
+					'status'   => 'failed',
+					'message'  => 'Update check failed: could not connect to child site.',
+					'context'  => array(
+						'detail' => sanitize_text_field( $response->get_error_message() ),
+					),
+				)
+			);
+
+			return new \WP_Error( 'rawatwp_check_failed', __( 'Could not connect to child site.', 'rawatwp' ) );
+		}
+
+		$http_code = (int) wp_remote_retrieve_response_code( $response );
+		$body      = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+
+		if ( $http_code < 200 || $http_code >= 300 || ! is_array( $body ) || empty( $body['status'] ) || 'ok' !== sanitize_key( (string) $body['status'] ) || empty( $body['updates'] ) || ! is_array( $body['updates'] ) ) {
+			$detail = '';
+			if ( is_array( $body ) && isset( $body['message'] ) ) {
+				$detail = sanitize_text_field( (string) $body['message'] );
+			}
+			$this->logger->log(
+				array(
+					'mode'     => 'master',
+					'site_url' => $site['site_url'],
+					'action'   => 'update_check_failed',
+					'status'   => 'failed',
+					'message'  => 'Update check failed: child response was invalid.',
+					'context'  => array(
+						'http_code' => $http_code,
+						'detail'    => $detail,
+					),
+				)
+			);
+
+			return new \WP_Error( 'rawatwp_check_invalid_response', __( 'Child response is invalid.', 'rawatwp' ) );
+		}
+
+		$snapshot = $this->sanitize_site_update_snapshot( (array) $body['updates'] );
+		$report   = $this->merge_site_last_report(
+			$site,
+			array(
+				'wp_update_check' => $snapshot,
+			)
+		);
+
+		$update_fields = array(
+			'connection_status' => 'connected',
+			'last_seen'         => current_time( 'mysql' ),
+			'last_report'       => $report,
+		);
+
+		$rawatwp_version = '';
+		if ( isset( $body['rawatwp_version'] ) ) {
+			$rawatwp_version = preg_replace( '/[^0-9A-Za-z.\-+]/', '', (string) $body['rawatwp_version'] );
+			$rawatwp_version = sanitize_text_field( (string) $rawatwp_version );
+		}
+		if ( '' !== $rawatwp_version ) {
+			$update_fields['rawatwp_version'] = $rawatwp_version;
+		}
+
+		$this->database->update_site( (int) $site['id'], $update_fields );
+
+		$this->logger->log(
+			array(
+				'mode'     => 'master',
+				'site_url' => $site['site_url'],
+				'action'   => 'update_check_success',
+				'status'   => 'success',
+				'message'  => sprintf(
+					'Update check completed. Core: %s, Themes: %d, Plugins: %d.',
+					! empty( $snapshot['core']['needs_update'] ) ? 'needs update' : 'up to date',
+					isset( $snapshot['counts']['themes'] ) ? (int) $snapshot['counts']['themes'] : 0,
+					isset( $snapshot['counts']['plugins'] ) ? (int) $snapshot['counts']['plugins'] : 0
+				),
+				'context'  => $snapshot,
+			)
+		);
+
+		return array(
+			'site'     => $site,
+			'snapshot' => $snapshot,
+		);
+	}
+
+	/**
+	 * Request WordPress update snapshots for many child sites.
+	 *
+	 * @param array $site_ids Site IDs.
+	 * @return array
+	 */
+	public function request_site_updates_snapshot_batch( array $site_ids ) {
+		$site_ids = array_values( array_unique( array_filter( array_map( 'intval', $site_ids ) ) ) );
+
+		$results = array(
+			'success' => array(),
+			'failed'  => array(),
+		);
+
+		foreach ( $site_ids as $site_id ) {
+			$result = $this->request_site_updates_snapshot( $site_id );
+			if ( is_wp_error( $result ) ) {
+				$site = $this->database->get_site_by_id( $site_id );
+				$results['failed'][] = array(
+					'site_id'   => $site_id,
+					'site_name' => is_array( $site ) ? (string) $site['site_name'] : (string) $site_id,
+					'message'   => $result->get_error_message(),
+				);
+				continue;
+			}
+
+			$results['success'][] = $result;
+		}
+
+		return $results;
+	}
+
+	/**
 	 * Dispatch one package update command to one child site.
 	 *
 	 * @param array $package Package data.
@@ -514,9 +683,12 @@ class MasterManager {
 		$update_fields = array(
 			'connection_status' => 'connected',
 			'last_seen'         => current_time( 'mysql' ),
-			'last_report'       => array(
-				'reported_at' => current_time( 'mysql' ),
-				'items'       => $items,
+			'last_report'       => $this->merge_site_last_report(
+				$site,
+				array(
+					'reported_at' => current_time( 'mysql' ),
+					'items'       => $items,
+				)
 			),
 		);
 		$rawatwp_version = $this->extract_packet_rawatwp_version( $packet );
@@ -681,5 +853,110 @@ class MasterManager {
 
 		$version = preg_replace( '/[^0-9A-Za-z.\-+]/', '', $version );
 		return sanitize_text_field( (string) $version );
+	}
+
+	/**
+	 * Merge last_report data safely.
+	 *
+	 * @param array $site Site row.
+	 * @param array $new_data Data to merge.
+	 * @return array
+	 */
+	private function merge_site_last_report( array $site, array $new_data ) {
+		$last_report = array();
+		if ( isset( $site['last_report'] ) && is_array( $site['last_report'] ) ) {
+			$last_report = $site['last_report'];
+		}
+
+		foreach ( $new_data as $key => $value ) {
+			$last_report[ sanitize_key( (string) $key ) ] = $value;
+		}
+
+		return $last_report;
+	}
+
+	/**
+	 * Sanitize site update snapshot payload from child.
+	 *
+	 * @param array $snapshot Raw snapshot.
+	 * @return array
+	 */
+	private function sanitize_site_update_snapshot( array $snapshot ) {
+		$core = isset( $snapshot['core'] ) && is_array( $snapshot['core'] ) ? $snapshot['core'] : array();
+		$core = array(
+			'needs_update'    => ! empty( $core['needs_update'] ),
+			'current_version' => isset( $core['current_version'] ) ? sanitize_text_field( (string) $core['current_version'] ) : '',
+			'latest_version'  => isset( $core['latest_version'] ) ? sanitize_text_field( (string) $core['latest_version'] ) : '',
+		);
+
+		$themes = array();
+		if ( isset( $snapshot['themes'] ) && is_array( $snapshot['themes'] ) ) {
+			foreach ( $snapshot['themes'] as $theme ) {
+				if ( ! is_array( $theme ) ) {
+					continue;
+				}
+				$slug = isset( $theme['slug'] ) ? sanitize_key( (string) $theme['slug'] ) : '';
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				$themes[] = array(
+					'slug'            => $slug,
+					'name'            => isset( $theme['name'] ) ? sanitize_text_field( (string) $theme['name'] ) : $slug,
+					'current_version' => isset( $theme['current_version'] ) ? sanitize_text_field( (string) $theme['current_version'] ) : '',
+					'new_version'     => isset( $theme['new_version'] ) ? sanitize_text_field( (string) $theme['new_version'] ) : '',
+				);
+			}
+		}
+
+		$plugins = array();
+		if ( isset( $snapshot['plugins'] ) && is_array( $snapshot['plugins'] ) ) {
+			foreach ( $snapshot['plugins'] as $plugin ) {
+				if ( ! is_array( $plugin ) ) {
+					continue;
+				}
+				$slug = isset( $plugin['slug'] ) ? sanitize_key( (string) $plugin['slug'] ) : '';
+				if ( '' === $slug ) {
+					continue;
+				}
+
+				$plugins[] = array(
+					'slug'            => $slug,
+					'name'            => isset( $plugin['name'] ) ? sanitize_text_field( (string) $plugin['name'] ) : $slug,
+					'current_version' => isset( $plugin['current_version'] ) ? sanitize_text_field( (string) $plugin['current_version'] ) : '',
+					'new_version'     => isset( $plugin['new_version'] ) ? sanitize_text_field( (string) $plugin['new_version'] ) : '',
+				);
+			}
+		}
+
+		$counts = array(
+			'core'    => ! empty( $core['needs_update'] ) ? 1 : 0,
+			'themes'  => count( $themes ),
+			'plugins' => count( $plugins ),
+			'total'   => ( ! empty( $core['needs_update'] ) ? 1 : 0 ) + count( $themes ) + count( $plugins ),
+		);
+
+		if ( isset( $snapshot['counts'] ) && is_array( $snapshot['counts'] ) ) {
+			if ( isset( $snapshot['counts']['core'] ) ) {
+				$counts['core'] = max( 0, min( 1, (int) $snapshot['counts']['core'] ) );
+			}
+			if ( isset( $snapshot['counts']['themes'] ) ) {
+				$counts['themes'] = max( 0, (int) $snapshot['counts']['themes'] );
+			}
+			if ( isset( $snapshot['counts']['plugins'] ) ) {
+				$counts['plugins'] = max( 0, (int) $snapshot['counts']['plugins'] );
+			}
+			$counts['total'] = $counts['core'] + $counts['themes'] + $counts['plugins'];
+		}
+
+		$checked_at = isset( $snapshot['checked_at'] ) ? sanitize_text_field( (string) $snapshot['checked_at'] ) : current_time( 'mysql' );
+
+		return array(
+			'checked_at' => $checked_at,
+			'core'       => $core,
+			'themes'     => $themes,
+			'plugins'    => $plugins,
+			'counts'     => $counts,
+		);
 	}
 }

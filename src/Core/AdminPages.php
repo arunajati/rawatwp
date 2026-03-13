@@ -179,6 +179,8 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_scan_installed_items', array( $this, 'handle_scan_installed_items' ) );
 		add_action( 'admin_post_rawatwp_add_site', array( $this, 'handle_add_site' ) );
 		add_action( 'admin_post_rawatwp_regen_key', array( $this, 'handle_regenerate_site_key' ) );
+		add_action( 'admin_post_rawatwp_check_site_updates', array( $this, 'handle_check_site_updates' ) );
+		add_action( 'admin_post_rawatwp_check_all_site_updates', array( $this, 'handle_check_all_site_updates' ) );
 		add_action( 'admin_post_rawatwp_queue_rawatwp_update_all_sites', array( $this, 'handle_queue_rawatwp_update_all_sites' ) );
 		add_action( 'admin_post_rawatwp_upload_package', array( $this, 'handle_upload_package' ) );
 		add_action( 'admin_post_rawatwp_scan_updates_folder', array( $this, 'handle_scan_updates_folder' ) );
@@ -450,6 +452,7 @@ class AdminPages {
 				$connected_count         = count( $connected_site_ids );
 				$master_version          = $this->get_runtime_rawatwp_version();
 				$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
+				$health_data_by_site     = $this->build_sites_health_overview( $sites );
 				?>
 				<div class="rawatwp-card">
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -472,11 +475,18 @@ class AdminPages {
 				<div class="rawatwp-card">
 					<div class="rawatwp-card-header">
 						<h2>Child Site List</h2>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
-							<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
-							<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
-							<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
-						</form>
+						<div class="rawatwp-toolbar">
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
+								<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
+								<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
+								<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+							</form>
+							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
+								<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
+								<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
+								<?php submit_button( 'Check Updates on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+							</form>
+						</div>
 					</div>
 					<p class="description">Master RawatWP Version: <strong><?php echo esc_html( $master_version ); ?></strong> | Connected sites: <strong><?php echo esc_html( (string) $connected_count ); ?></strong></p>
 					<table class="widefat striped rawatwp-sites-table">
@@ -513,6 +523,14 @@ class AdminPages {
 									<td class="rawatwp-col-status"><?php echo esc_html( $site['connection_status'] ); ?></td>
 									<td class="rawatwp-col-last-seen"><?php echo esc_html( $this->format_datetime_for_display( isset( $site['last_seen'] ) ? $site['last_seen'] : '' ) ); ?></td>
 									<td class="rawatwp-col-action">
+										<?php if ( 'connected' === sanitize_key( (string) $site['connection_status'] ) ) : ?>
+											<form class="rawatwp-action-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+												<?php wp_nonce_field( 'rawatwp_check_site_updates' ); ?>
+												<input type="hidden" name="action" value="rawatwp_check_site_updates" />
+												<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
+												<button class="button button-secondary" type="submit">Check Updates</button>
+											</form>
+										<?php endif; ?>
 										<form class="rawatwp-action-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 											<?php wp_nonce_field( 'rawatwp_regen_key' ); ?>
 											<input type="hidden" name="action" value="rawatwp_regen_key" />
@@ -524,6 +542,90 @@ class AdminPages {
 							<?php endforeach; ?>
 						</tbody>
 					</table>
+				</div>
+
+				<div class="rawatwp-card" id="rawatwp-update-health">
+					<div class="rawatwp-card-header">
+						<h2>Update Health Overview</h2>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
+							<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
+							<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
+							<?php submit_button( 'Check All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+						</form>
+					</div>
+					<p class="description">Manual trigger only. RawatWP does not run scheduled auto-update checks.</p>
+					<?php if ( $connected_count <= 0 ) : ?>
+						<p>No connected child sites yet.</p>
+					<?php else : ?>
+						<div class="rawatwp-site-health-list">
+							<?php foreach ( $sites as $site ) : ?>
+								<?php
+								$site_id      = (int) $site['id'];
+								$is_connected = isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] );
+								if ( ! $is_connected ) {
+									continue;
+								}
+								$health = isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ? $health_data_by_site[ $site_id ] : array();
+								?>
+								<div class="rawatwp-site-health-item">
+									<div class="rawatwp-site-health-head">
+										<div>
+											<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
+										</div>
+										<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+											<?php wp_nonce_field( 'rawatwp_check_site_updates' ); ?>
+											<input type="hidden" name="action" value="rawatwp_check_site_updates" />
+											<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site_id ); ?>" />
+											<button class="button button-secondary" type="submit">Check Now</button>
+										</form>
+									</div>
+									<?php if ( empty( $health ) ) : ?>
+										<p class="rawatwp-site-health-meta">Not checked yet.</p>
+									<?php else : ?>
+										<p class="rawatwp-site-health-meta">
+											<?php
+											echo esc_html(
+												sprintf(
+													'Core: %s | Themes: %d | Plugins: %d | Last check: %s',
+													! empty( $health['core']['needs_update'] ) ? 'Needs update' : 'Up to date',
+													isset( $health['counts']['themes'] ) ? (int) $health['counts']['themes'] : 0,
+													isset( $health['counts']['plugins'] ) ? (int) $health['counts']['plugins'] : 0,
+													$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
+												)
+											);
+											?>
+										</p>
+										<?php if ( ! empty( $health['counts']['total'] ) ) : ?>
+											<details class="rawatwp-site-health-details">
+												<summary>View update details</summary>
+												<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
+													<p>WordPress Core: <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></p>
+												<?php endif; ?>
+
+												<?php if ( ! empty( $health['themes'] ) && is_array( $health['themes'] ) ) : ?>
+													<p><strong>Themes</strong></p>
+													<ul>
+														<?php foreach ( $health['themes'] as $theme_item ) : ?>
+															<li><?php echo esc_html( (string) $theme_item['name'] . ' (' . (string) $theme_item['current_version'] . ' -> ' . (string) $theme_item['new_version'] . ')' ); ?></li>
+														<?php endforeach; ?>
+													</ul>
+												<?php endif; ?>
+
+												<?php if ( ! empty( $health['plugins'] ) && is_array( $health['plugins'] ) ) : ?>
+													<p><strong>Plugins</strong></p>
+													<ul>
+														<?php foreach ( $health['plugins'] as $plugin_item ) : ?>
+															<li><?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
+														<?php endforeach; ?>
+													</ul>
+												<?php endif; ?>
+											</details>
+										<?php endif; ?>
+									<?php endif; ?>
+								</div>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
 				</div>
 
 				<script>
@@ -1705,6 +1807,111 @@ class AdminPages {
 	}
 
 	/**
+	 * Run manual update check for one child site.
+	 *
+	 * @return void
+	 */
+	public function handle_check_site_updates() {
+		$this->assert_admin_post( 'rawatwp_check_site_updates' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'This feature is available only in Master mode.' );
+		}
+
+		$site_id = isset( $_POST['site_id'] ) ? (int) $_POST['site_id'] : 0;
+		if ( $site_id <= 0 ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'Invalid child site.' );
+		}
+
+		$result = $this->master_manager->request_site_updates_snapshot( $site_id );
+		if ( is_wp_error( $result ) ) {
+			$url = add_query_arg(
+				array(
+					'page' => 'rawatwp-sites',
+				),
+				admin_url( 'admin.php' )
+			) . '#rawatwp-update-health';
+			$this->redirect_to_url_with_notice( $url, '', $result->get_error_message() );
+		}
+
+		$site_name = isset( $result['site']['site_name'] ) ? sanitize_text_field( (string) $result['site']['site_name'] ) : 'Child site';
+		$snapshot  = isset( $result['snapshot'] ) && is_array( $result['snapshot'] ) ? $result['snapshot'] : array();
+		$themes    = isset( $snapshot['counts']['themes'] ) ? (int) $snapshot['counts']['themes'] : 0;
+		$plugins   = isset( $snapshot['counts']['plugins'] ) ? (int) $snapshot['counts']['plugins'] : 0;
+		$core_text = ( isset( $snapshot['core']['needs_update'] ) && ! empty( $snapshot['core']['needs_update'] ) ) ? 'needs update' : 'up to date';
+
+		$notice = sprintf(
+			'Update check completed for %s. Core: %s, Themes: %d, Plugins: %d.',
+			$site_name,
+			$core_text,
+			$themes,
+			$plugins
+		);
+
+		$url = add_query_arg(
+			array(
+				'page' => 'rawatwp-sites',
+			),
+			admin_url( 'admin.php' )
+		) . '#rawatwp-update-health';
+
+		$this->redirect_to_url_with_notice( $url, $notice, '' );
+	}
+
+	/**
+	 * Run manual update check for all connected child sites.
+	 *
+	 * @return void
+	 */
+	public function handle_check_all_site_updates() {
+		$this->assert_admin_post( 'rawatwp_check_all_site_updates' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'This feature is available only in Master mode.' );
+		}
+
+		$sites    = $this->master_manager->get_sites();
+		$site_ids = array();
+		foreach ( $sites as $site ) {
+			if ( isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] ) ) {
+				$site_ids[] = (int) $site['id'];
+			}
+		}
+
+		if ( empty( $site_ids ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'No connected child sites found.' );
+		}
+
+		$summary      = $this->master_manager->request_site_updates_snapshot_batch( $site_ids );
+		$success_count = isset( $summary['success'] ) && is_array( $summary['success'] ) ? count( $summary['success'] ) : 0;
+		$failed_count  = isset( $summary['failed'] ) && is_array( $summary['failed'] ) ? count( $summary['failed'] ) : 0;
+		$total_count   = $success_count + $failed_count;
+
+		$notice = sprintf(
+			'Manual update check finished for %d site(s). Success: %d, Failed: %d.',
+			$total_count,
+			$success_count,
+			$failed_count
+		);
+		$error = '';
+		if ( $failed_count > 0 ) {
+			$first_failed = $summary['failed'][0];
+			$site_name    = isset( $first_failed['site_name'] ) ? sanitize_text_field( (string) $first_failed['site_name'] ) : 'Child site';
+			$reason       = isset( $first_failed['message'] ) ? sanitize_text_field( (string) $first_failed['message'] ) : 'Unknown error.';
+			$error        = sprintf( 'Some sites failed. First failure: %s (%s)', $site_name, $reason );
+		}
+
+		$url = add_query_arg(
+			array(
+				'page' => 'rawatwp-sites',
+			),
+			admin_url( 'admin.php' )
+		) . '#rawatwp-update-health';
+
+		$this->redirect_to_url_with_notice( $url, $notice, $error );
+	}
+
+	/**
 	 * Queue RawatWP plugin update to all connected child sites.
 	 *
 	 * @return void
@@ -2382,6 +2589,94 @@ class AdminPages {
 	}
 
 	/**
+	 * Build per-site health overview from stored child update snapshots.
+	 *
+	 * @param array $sites Site rows.
+	 * @return array
+	 */
+	private function build_sites_health_overview( array $sites ) {
+		$results = array();
+
+		foreach ( $sites as $site ) {
+			$site_id = isset( $site['id'] ) ? (int) $site['id'] : 0;
+			if ( $site_id <= 0 ) {
+				continue;
+			}
+
+			$report = isset( $site['last_report'] ) && is_array( $site['last_report'] ) ? $site['last_report'] : array();
+			if ( empty( $report['wp_update_check'] ) || ! is_array( $report['wp_update_check'] ) ) {
+				$results[ $site_id ] = array();
+				continue;
+			}
+
+			$snapshot = $report['wp_update_check'];
+			$core     = isset( $snapshot['core'] ) && is_array( $snapshot['core'] ) ? $snapshot['core'] : array();
+			$themes   = isset( $snapshot['themes'] ) && is_array( $snapshot['themes'] ) ? $snapshot['themes'] : array();
+			$plugins  = isset( $snapshot['plugins'] ) && is_array( $snapshot['plugins'] ) ? $snapshot['plugins'] : array();
+			$counts   = isset( $snapshot['counts'] ) && is_array( $snapshot['counts'] ) ? $snapshot['counts'] : array();
+
+			$results[ $site_id ] = array(
+				'checked_at' => isset( $snapshot['checked_at'] ) ? sanitize_text_field( (string) $snapshot['checked_at'] ) : '',
+				'core'       => array(
+					'needs_update'    => ! empty( $core['needs_update'] ),
+					'current_version' => isset( $core['current_version'] ) ? sanitize_text_field( (string) $core['current_version'] ) : '',
+					'latest_version'  => isset( $core['latest_version'] ) ? sanitize_text_field( (string) $core['latest_version'] ) : '',
+				),
+				'themes'     => array_values(
+					array_filter(
+						array_map(
+							function( $theme ) {
+								if ( ! is_array( $theme ) ) {
+									return array();
+								}
+
+								return array(
+									'name'            => isset( $theme['name'] ) ? sanitize_text_field( (string) $theme['name'] ) : '',
+									'current_version' => isset( $theme['current_version'] ) ? sanitize_text_field( (string) $theme['current_version'] ) : '',
+									'new_version'     => isset( $theme['new_version'] ) ? sanitize_text_field( (string) $theme['new_version'] ) : '',
+								);
+							},
+							$themes
+						),
+						static function( $theme ) {
+							return is_array( $theme ) && ! empty( $theme );
+						}
+					)
+				),
+				'plugins'    => array_values(
+					array_filter(
+						array_map(
+							function( $plugin ) {
+								if ( ! is_array( $plugin ) ) {
+									return array();
+								}
+
+								return array(
+									'name'            => isset( $plugin['name'] ) ? sanitize_text_field( (string) $plugin['name'] ) : '',
+									'current_version' => isset( $plugin['current_version'] ) ? sanitize_text_field( (string) $plugin['current_version'] ) : '',
+									'new_version'     => isset( $plugin['new_version'] ) ? sanitize_text_field( (string) $plugin['new_version'] ) : '',
+								);
+							},
+							$plugins
+						),
+						static function( $plugin ) {
+							return is_array( $plugin ) && ! empty( $plugin );
+						}
+					)
+				),
+				'counts'     => array(
+					'core'    => isset( $counts['core'] ) ? max( 0, min( 1, (int) $counts['core'] ) ) : ( ! empty( $core['needs_update'] ) ? 1 : 0 ),
+					'themes'  => isset( $counts['themes'] ) ? max( 0, (int) $counts['themes'] ) : count( $themes ),
+					'plugins' => isset( $counts['plugins'] ) ? max( 0, (int) $counts['plugins'] ) : count( $plugins ),
+					'total'   => isset( $counts['total'] ) ? max( 0, (int) $counts['total'] ) : ( ( ! empty( $core['needs_update'] ) ? 1 : 0 ) + count( $themes ) + count( $plugins ) ),
+				),
+			);
+		}
+
+		return $results;
+	}
+
+	/**
 	 * Format log item for UI.
 	 *
 	 * @param string $item_type Item type.
@@ -2440,6 +2735,9 @@ class AdminPages {
 			'package_deleted'    => 'Package Deleted',
 			'package_upload_failed' => 'Package Upload Failed',
 			'queue_created'      => 'Queue Created',
+			'update_check_started' => 'Update Check Started',
+			'update_check_success' => 'Update Check Completed',
+			'update_check_failed'  => 'Update Check Failed',
 			'update_started'     => 'Update Started',
 			'update_result'      => 'Update Result',
 			'update_success'     => 'Update Succeeded',
@@ -2542,6 +2840,8 @@ class AdminPages {
 			'Update sukses melalui fallback replace.'       => 'Update completed successfully using safe fallback method.',
 			'Update sukses via WP-native.'                  => 'Update completed successfully using WordPress installer.',
 			'Update sukses via fallback replace.'           => 'Update completed successfully using safe fallback method.',
+			'Manual update check started for child site.'   => 'Manual update check has started on child site.',
+			'Manual update check failed on child site.'     => 'Manual update check failed on child site.',
 		);
 
 		if ( isset( $direct_map[ $message ] ) ) {
@@ -2632,6 +2932,9 @@ class AdminPages {
 			'package_scanned'    => 'Package imported from updates folder.',
 			'package_deleted'    => 'Package deleted successfully.',
 			'package_upload_failed' => 'Package upload failed.',
+			'update_check_started' => 'Manual update check has started on child site.',
+			'update_check_success' => 'Manual update check completed.',
+			'update_check_failed'  => 'Manual update check failed on child site.',
 			'update_started'     => 'Update has started.',
 			'update_success'     => 'Update completed successfully.',
 			'update_failed'      => 'Update failed.',

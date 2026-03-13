@@ -120,6 +120,16 @@ class ApiManager {
 
 		register_rest_route(
 			'rawatwp/v1',
+			'/child/check-updates',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this->child_manager, 'rest_check_updates' ),
+				'permission_callback' => '__return_true',
+			)
+		);
+
+		register_rest_route(
+			'rawatwp/v1',
 			'/master/queue-run',
 			array(
 				'methods'             => 'GET',
