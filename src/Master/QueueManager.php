@@ -102,6 +102,19 @@ class QueueManager {
 			return new \WP_Error( 'rawatwp_package_not_found', __( 'Package not found.', 'rawatwp' ) );
 		}
 
+		// Guardrail: RawatWP update must always use package built from
+		// currently running Master plugin files (prevents accidental downgrade).
+		if ( 'plugin' === (string) $package['type'] && 'rawatwp' === sanitize_key( (string) $package['target_slug'] ) ) {
+			$current_rawatwp_package = $this->package_manager->ensure_rawatwp_self_package();
+			if ( is_wp_error( $current_rawatwp_package ) ) {
+				return $current_rawatwp_package;
+			}
+
+			if ( is_array( $current_rawatwp_package ) && ! empty( $current_rawatwp_package['id'] ) ) {
+				$package = $current_rawatwp_package;
+			}
+		}
+
 		if ( ! in_array( $package['type'], array( 'plugin', 'theme', 'core' ), true ) ) {
 			return new \WP_Error( 'rawatwp_package_type_unsupported', __( 'This package type is not supported.', 'rawatwp' ) );
 		}
@@ -569,21 +582,16 @@ class QueueManager {
 			return new \WP_Error( 'rawatwp_patch_target_missing', __( 'Selected patch target is invalid.', 'rawatwp' ) );
 		}
 
-		$all_packages = $this->package_manager->get_packages();
-		$grouped      = array();
+		$all_packages       = $this->package_manager->get_packages();
+		$grouped            = array();
+		$sequence_group_key = $this->get_patch_sequence_group_key( $selected_package );
 
 		foreach ( $all_packages as $candidate ) {
 			if ( ! is_array( $candidate ) ) {
 				continue;
 			}
 
-			$candidate_type = isset( $candidate['type'] ) ? sanitize_key( (string) $candidate['type'] ) : '';
-			$candidate_slug = isset( $candidate['target_slug'] ) ? sanitize_key( (string) $candidate['target_slug'] ) : '';
-			if ( $candidate_type !== $target_type || $candidate_slug !== $target_slug ) {
-				continue;
-			}
-
-			if ( ! $this->is_sequential_patch_candidate( $candidate ) ) {
+			if ( ! $this->is_same_patch_sequence_group( $selected_package, $candidate, $sequence_group_key ) ) {
 				continue;
 			}
 
@@ -592,34 +600,171 @@ class QueueManager {
 				continue;
 			}
 
-			// get_packages() is sorted newest-first; keep first for each number.
-			if ( ! isset( $grouped[ $number ] ) ) {
-				$grouped[ $number ] = $candidate;
+			$candidate_type = isset( $candidate['type'] ) ? sanitize_key( (string) $candidate['type'] ) : '';
+			$candidate_slug = isset( $candidate['target_slug'] ) ? sanitize_key( (string) $candidate['target_slug'] ) : '';
+			$group_key      = $number . '|' . $candidate_type . '|' . $candidate_slug;
+
+			// get_packages() returns newest-first. Keep first for each patch+target pair.
+			if ( ! isset( $grouped[ $group_key ] ) ) {
+				$grouped[ $group_key ] = $candidate;
 			}
 		}
 
-		$grouped[ $selected_number ] = $selected_package;
-		ksort( $grouped, SORT_NUMERIC );
+		$selected_group_key              = $selected_number . '|' . $target_type . '|' . $target_slug;
+		$grouped[ $selected_group_key ]  = $selected_package;
+		$sequence                        = array_values( $grouped );
+		$self                            = $this;
 
-		$sequence = array();
-		$numbers  = array();
-		foreach ( $grouped as $number => $candidate ) {
-			$number = (int) $number;
+		usort(
+			$sequence,
+			static function( $a, $b ) use ( $self ) {
+				$a_number = $self->extract_patch_number( $a );
+				$b_number = $self->extract_patch_number( $b );
+				if ( $a_number !== $b_number ) {
+					return $a_number <=> $b_number;
+				}
+
+				$a_type = isset( $a['type'] ) ? sanitize_key( (string) $a['type'] ) : '';
+				$b_type = isset( $b['type'] ) ? sanitize_key( (string) $b['type'] ) : '';
+				$a_rank = $self->get_patch_type_priority( $a_type );
+				$b_rank = $self->get_patch_type_priority( $b_type );
+				if ( $a_rank !== $b_rank ) {
+					return $a_rank <=> $b_rank;
+				}
+
+				$a_slug = isset( $a['target_slug'] ) ? sanitize_key( (string) $a['target_slug'] ) : '';
+				$b_slug = isset( $b['target_slug'] ) ? sanitize_key( (string) $b['target_slug'] ) : '';
+				if ( $a_slug !== $b_slug ) {
+					return strcmp( $a_slug, $b_slug );
+				}
+
+				$a_id = isset( $a['id'] ) ? (int) $a['id'] : 0;
+				$b_id = isset( $b['id'] ) ? (int) $b['id'] : 0;
+
+				return $a_id <=> $b_id;
+			}
+		);
+
+		$filtered_sequence = array();
+		$numbers           = array();
+		foreach ( $sequence as $candidate ) {
+			$number = $this->extract_patch_number( $candidate );
 			if ( $number > $selected_number ) {
 				continue;
 			}
-			$sequence[] = $candidate;
-			$numbers[]  = $number;
+			$filtered_sequence[] = $candidate;
+			$numbers[ $number ]  = true;
 		}
 
-		if ( empty( $sequence ) ) {
+		if ( empty( $filtered_sequence ) ) {
 			return new \WP_Error( 'rawatwp_patch_sequence_empty', __( 'No valid patch sequence was found for this target.', 'rawatwp' ) );
 		}
 
+		$number_list = array_map( 'intval', array_keys( $numbers ) );
+		sort( $number_list, SORT_NUMERIC );
+
 		return array(
-			'packages' => $sequence,
-			'numbers'  => $numbers,
+			'packages' => $filtered_sequence,
+			'numbers'  => $number_list,
 		);
+	}
+
+	/**
+	 * Get sequence grouping key for patch package.
+	 *
+	 * @param array $package Package row.
+	 * @return string
+	 */
+	private function get_patch_sequence_group_key( array $package ) {
+		$type        = isset( $package['type'] ) ? sanitize_key( (string) $package['type'] ) : '';
+		$slug        = isset( $package['target_slug'] ) ? sanitize_key( (string) $package['target_slug'] ) : '';
+		$source_type = isset( $package['source_type'] ) ? sanitize_key( (string) $package['source_type'] ) : '';
+		$number      = $this->extract_patch_number( $package );
+
+		$haystack = strtolower(
+			implode(
+				' ',
+				array(
+					$slug,
+					isset( $package['label'] ) ? (string) $package['label'] : '',
+					isset( $package['file_name'] ) ? (string) $package['file_name'] : '',
+					isset( $package['source_name'] ) ? (string) $package['source_name'] : '',
+				)
+			)
+		);
+
+		$is_patch_like = $number > 0 || in_array( $source_type, array( 'patch_source', 'patch_bundle' ), true );
+		if ( $is_patch_like ) {
+			$avada_family_slugs = array(
+				'avada',
+				'fusion-builder',
+				'fusion-core',
+				'fusion-white-label-branding',
+			);
+			if ( in_array( $slug, $avada_family_slugs, true )
+				|| false !== strpos( $haystack, 'avada' )
+				|| false !== strpos( $haystack, 'fusion-builder' )
+				|| false !== strpos( $haystack, 'fusion-core' )
+				|| false !== strpos( $haystack, 'fusion core' ) ) {
+				return 'suite:avada';
+			}
+		}
+
+		if ( '' === $type || '' === $slug ) {
+			return '';
+		}
+
+		return 'target:' . $type . ':' . $slug;
+	}
+
+	/**
+	 * Check whether two packages belong to the same patch sequence group.
+	 *
+	 * @param array  $selected_package Selected package.
+	 * @param array  $candidate Candidate package.
+	 * @param string $selected_group_key Selected group key.
+	 * @return bool
+	 */
+	private function is_same_patch_sequence_group( array $selected_package, array $candidate, $selected_group_key ) {
+		if ( ! $this->is_sequential_patch_candidate( $candidate ) ) {
+			return false;
+		}
+
+		$selected_group_key = (string) $selected_group_key;
+		if ( '' !== $selected_group_key ) {
+			$candidate_group_key = $this->get_patch_sequence_group_key( $candidate );
+			return '' !== $candidate_group_key && $candidate_group_key === $selected_group_key;
+		}
+
+		$selected_type = isset( $selected_package['type'] ) ? sanitize_key( (string) $selected_package['type'] ) : '';
+		$selected_slug = isset( $selected_package['target_slug'] ) ? sanitize_key( (string) $selected_package['target_slug'] ) : '';
+		$candidate_type = isset( $candidate['type'] ) ? sanitize_key( (string) $candidate['type'] ) : '';
+		$candidate_slug = isset( $candidate['target_slug'] ) ? sanitize_key( (string) $candidate['target_slug'] ) : '';
+
+		return '' !== $selected_type && '' !== $selected_slug && $selected_type === $candidate_type && $selected_slug === $candidate_slug;
+	}
+
+	/**
+	 * Get package type priority for same patch number ordering.
+	 *
+	 * @param string $type Package type.
+	 * @return int
+	 */
+	private function get_patch_type_priority( $type ) {
+		$type = sanitize_key( (string) $type );
+		if ( 'theme' === $type ) {
+			return 1;
+		}
+
+		if ( 'plugin' === $type ) {
+			return 2;
+		}
+
+		if ( 'core' === $type ) {
+			return 3;
+		}
+
+		return 9;
 	}
 
 	/**

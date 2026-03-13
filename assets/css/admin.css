@@ -79,10 +79,48 @@
 
 .rawatwp-admin .widefat {
 	margin-top: 10px;
+	width: 100%;
+	table-layout: auto;
 }
 
 .rawatwp-admin .widefat thead th {
 	font-weight: 600;
+	position: relative;
+	vertical-align: middle;
+}
+
+.rawatwp-admin .widefat th,
+.rawatwp-admin .widefat td {
+	padding: 10px 12px;
+	line-height: 1.45;
+	vertical-align: middle;
+}
+
+.rawatwp-admin .widefat thead th.rawatwp-sortable {
+	cursor: pointer;
+	user-select: none;
+	padding-right: 22px;
+}
+
+.rawatwp-admin .widefat thead th.rawatwp-sortable::after {
+	content: "\2195";
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: #8c8f94;
+	font-size: 11px;
+	line-height: 1;
+}
+
+.rawatwp-admin .widefat thead th.rawatwp-sort-asc::after {
+	content: "\2191";
+	color: #2271b1;
+}
+
+.rawatwp-admin .widefat thead th.rawatwp-sort-desc::after {
+	content: "\2193";
+	color: #2271b1;
 }
 
 .rawatwp-admin .form-table th {
@@ -130,41 +168,53 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-id {
-	width: 42px;
+	width: 56px;
+	white-space: nowrap;
+	text-align: center;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-site {
-	width: 170px;
+	width: 18%;
+	min-width: 170px;
+	word-break: break-word;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain {
-	width: 30%;
+	width: 25%;
+	min-width: 220px;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-rwp-version {
-	width: 115px;
+	width: 10%;
+	min-width: 112px;
 	white-space: nowrap;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-key {
-	width: 110px;
+	width: 9%;
+	min-width: 98px;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-status {
-	width: 95px;
+	width: 8%;
+	min-width: 90px;
+	white-space: nowrap;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-last-seen {
-	width: 150px;
+	width: 13%;
+	min-width: 150px;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-action {
-	width: 155px;
+	width: 12%;
+	min-width: 150px;
 	white-space: nowrap;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-domain {
 	word-break: break-word;
+	overflow-wrap: anywhere;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-key-wrap {

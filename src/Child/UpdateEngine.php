@@ -673,15 +673,19 @@ class UpdateEngine {
 			return false;
 		}
 
-		$prefixes = array(
+		$native_prefixes = array(
 			$slug . '/',
+			'wordpress/' . $slug . '/',
+		);
+		$patch_prefixes  = array(
 			'wp-content/plugins/' . $slug . '/',
 			'wp-content/themes/' . $slug . '/',
 			'wordpress/wp-content/plugins/' . $slug . '/',
 			'wordpress/wp-content/themes/' . $slug . '/',
 		);
 
-		$allowed = false;
+		$has_native_prefix = false;
+		$has_patch_prefix  = false;
 
 		for ( $index = 0; $index < $zip->numFiles; $index++ ) {
 			$stat = $zip->statIndex( $index );
@@ -690,17 +694,34 @@ class UpdateEngine {
 			}
 
 			$name = strtolower( str_replace( '\\', '/', (string) $stat['name'] ) );
-			foreach ( $prefixes as $prefix ) {
+			foreach ( $patch_prefixes as $prefix ) {
 				if ( 0 === strpos( $name, strtolower( $prefix ) ) ) {
-					$allowed = true;
-					break 2;
+					$has_patch_prefix = true;
+					break;
 				}
+			}
+
+			foreach ( $native_prefixes as $prefix ) {
+				if ( 0 === strpos( $name, strtolower( $prefix ) ) ) {
+					$has_native_prefix = true;
+					break;
+				}
+			}
+
+			if ( $has_patch_prefix && $has_native_prefix ) {
+				break;
 			}
 		}
 
 		$zip->close();
 
-		if ( ! $allowed ) {
+		// Packages with wp-content path are treated as patch-style payload:
+		// force fallback copy/replace to preserve target mapping.
+		if ( $has_patch_prefix ) {
+			return false;
+		}
+
+		if ( ! $has_native_prefix ) {
 			return false;
 		}
 

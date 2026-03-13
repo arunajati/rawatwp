@@ -1125,26 +1125,8 @@ class PackageManager {
 			);
 		}
 
-		$theme_slug = $this->detect_theme_slug( $extracted_dir );
-		if ( '' !== $theme_slug ) {
-			return array(
-				'type'        => 'theme',
-				'target_slug' => $theme_slug,
-				'label'       => $label,
-				'source_type' => 'direct',
-			);
-		}
-
-		$plugin_slug = $this->detect_plugin_slug( $extracted_dir );
-		if ( '' !== $plugin_slug ) {
-			return array(
-				'type'        => 'plugin',
-				'target_slug' => $plugin_slug,
-				'label'       => $label,
-				'source_type' => 'direct',
-			);
-		}
-
+		// If payload is stored under wp-content paths, treat it as patch-source
+		// so child updater will run controlled fallback replace on target slug.
 		$theme_patch_slug = $this->detect_content_path_slug( $extracted_dir, 'theme' );
 		if ( '' !== $theme_patch_slug ) {
 			return array(
@@ -1162,6 +1144,26 @@ class PackageManager {
 				'target_slug' => $plugin_patch_slug,
 				'label'       => $label,
 				'source_type' => 'patch_source',
+			);
+		}
+
+		$theme_slug = $this->detect_theme_slug( $extracted_dir );
+		if ( '' !== $theme_slug ) {
+			return array(
+				'type'        => 'theme',
+				'target_slug' => $theme_slug,
+				'label'       => $label,
+				'source_type' => 'direct',
+			);
+		}
+
+		$plugin_slug = $this->detect_plugin_slug( $extracted_dir );
+		if ( '' !== $plugin_slug ) {
+			return array(
+				'type'        => 'plugin',
+				'target_slug' => $plugin_slug,
+				'label'       => $label,
+				'source_type' => 'direct',
 			);
 		}
 

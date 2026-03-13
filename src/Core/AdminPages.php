@@ -153,6 +153,14 @@ class AdminPages {
 			array(),
 			RAWATWP_VERSION
 		);
+
+		wp_enqueue_script(
+			'rawatwp-admin',
+			RAWATWP_URL . 'assets/js/admin.js',
+			array(),
+			RAWATWP_VERSION,
+			true
+		);
 	}
 
 	/**
@@ -440,6 +448,7 @@ class AdminPages {
 					}
 				}
 				$connected_count         = count( $connected_site_ids );
+				$master_version          = $this->get_runtime_rawatwp_version();
 				$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
 				?>
 				<div class="rawatwp-card">
@@ -466,10 +475,10 @@ class AdminPages {
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
 							<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
 							<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
-							<?php submit_button( 'Update RawatWP on All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+							<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
 						</form>
 					</div>
-					<p class="description">Master RawatWP Version: <strong><?php echo esc_html( RAWATWP_VERSION ); ?></strong> | Connected sites: <strong><?php echo esc_html( (string) $connected_count ); ?></strong></p>
+					<p class="description">Master RawatWP Version: <strong><?php echo esc_html( $master_version ); ?></strong> | Connected sites: <strong><?php echo esc_html( (string) $connected_count ); ?></strong></p>
 					<table class="widefat striped rawatwp-sites-table">
 						<thead>
 							<tr>
@@ -1295,7 +1304,7 @@ class AdminPages {
 						</form>
 					</div>
 
-					<div class="rawatwp-card">
+					<div class="rawatwp-card" id="rawatwp-update-progress">
 						<div class="rawatwp-card-header">
 							<h2>Update Progress</h2>
 							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all completed update progress rows? Running queue items will stay untouched.');">
@@ -1369,6 +1378,16 @@ class AdminPages {
 					</div>
 					<script>
 					(function() {
+						if (window.location.hash === '#rawatwp-update-progress') {
+							window.setTimeout(function() {
+								var updateProgressCard = document.getElementById('rawatwp-update-progress');
+								if (!updateProgressCard) {
+									return;
+								}
+								updateProgressCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+							}, 120);
+						}
+
 						var hasPending = <?php echo (int) ( $has_pending ? 1 : 0 ); ?>;
 						var paused = <?php echo (int) ( $queue_paused ? 1 : 0 ); ?>;
 						var ajaxNonce = <?php echo wp_json_encode( $ajax_nonce ); ?>;
@@ -1728,7 +1747,14 @@ class AdminPages {
 			count( $site_ids ),
 			isset( $result['batch_id'] ) ? (string) $result['batch_id'] : '-'
 		);
-		$this->redirect_with_notice( 'rawatwp-sites', $message, '' );
+		$updates_url = add_query_arg(
+			array(
+				'page' => 'rawatwp-updates',
+			),
+			admin_url( 'admin.php' )
+		);
+		$updates_url .= '#rawatwp-update-progress';
+		$this->redirect_to_url_with_notice( $updates_url, $message, '' );
 	}
 
 	/**
@@ -2728,6 +2754,32 @@ class AdminPages {
 		}
 
 		return $valid;
+	}
+
+	/**
+	 * Get currently installed RawatWP version from plugin header.
+	 *
+	 * @return string
+	 */
+	private function get_runtime_rawatwp_version() {
+		$version = '';
+
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		if ( function_exists( 'get_plugin_data' ) && defined( 'RAWATWP_FILE' ) ) {
+			$data = get_plugin_data( RAWATWP_FILE, false, false );
+			if ( is_array( $data ) && ! empty( $data['Version'] ) ) {
+				$version = sanitize_text_field( (string) $data['Version'] );
+			}
+		}
+
+		if ( '' === $version && defined( 'RAWATWP_VERSION' ) ) {
+			$version = sanitize_text_field( (string) RAWATWP_VERSION );
+		}
+
+		return '' !== $version ? $version : '-';
 	}
 
 	/**
