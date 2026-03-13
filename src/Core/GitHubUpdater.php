@@ -227,11 +227,7 @@ class GitHubUpdater {
 			return;
 		}
 
-		$this->flush_release_cache();
-		delete_site_transient( 'update_plugins' );
-		if ( function_exists( 'wp_clean_plugins_cache' ) ) {
-			wp_clean_plugins_cache( true );
-		}
+		$this->hard_reset_update_caches();
 
 		if ( ! function_exists( 'wp_update_plugins' ) ) {
 			require_once ABSPATH . 'wp-includes/update.php';
@@ -367,6 +363,7 @@ class GitHubUpdater {
 	 * @return array|\WP_Error
 	 */
 	public function force_check_now() {
+		$this->hard_reset_update_caches();
 		$this->flush_release_cache();
 		$release = $this->get_latest_release( true );
 		if ( is_wp_error( $release ) ) {
@@ -375,11 +372,14 @@ class GitHubUpdater {
 		}
 
 		update_option( self::OPTION_LAST_ERROR, '', false );
-		delete_site_transient( 'update_plugins' );
+		$this->hard_reset_update_caches();
 		if ( ! function_exists( 'wp_update_plugins' ) ) {
 			require_once ABSPATH . 'wp-includes/update.php';
 		}
 		wp_update_plugins();
+		if ( function_exists( 'wp_clean_plugins_cache' ) ) {
+			wp_clean_plugins_cache( true );
+		}
 
 		return $release;
 	}
@@ -422,6 +422,8 @@ class GitHubUpdater {
 				'User-Agent'           => 'RawatWP/' . RAWATWP_VERSION,
 				'X-GitHub-Api-Version' => '2022-11-28',
 				'Cache-Control'        => 'no-cache',
+				'Pragma'               => 'no-cache',
+				'Expires'              => '0',
 			),
 		);
 
@@ -429,14 +431,15 @@ class GitHubUpdater {
 			$args['headers']['Authorization'] = 'Bearer ' . (string) $this->settings['token'];
 		}
 
-		$latest_url = sprintf(
-			'https://api.github.com/repos/%s/%s/releases/latest?rawatwp_cache=%d',
+		$request_nonce = $this->build_request_nonce( $force_refresh );
+		$latest_url    = sprintf(
+			'https://api.github.com/repos/%s/%s/releases/latest?rawatwp_cache=%s',
 			$owner,
 			$repo,
-			time()
+			rawurlencode( $request_nonce )
 		);
 		$latest_release = $this->fetch_single_release_from_url( $latest_url, $args );
-		$list_release   = $this->fetch_best_release_from_list( $owner, $repo, $args );
+		$list_release   = $this->fetch_best_release_from_list( $owner, $repo, $args, $request_nonce );
 
 		$release = null;
 		if ( ! is_wp_error( $latest_release ) && ! is_wp_error( $list_release ) ) {
@@ -493,12 +496,12 @@ class GitHubUpdater {
 	 * @param array  $args HTTP args.
 	 * @return array|\WP_Error
 	 */
-	private function fetch_best_release_from_list( $owner, $repo, array $args ) {
+	private function fetch_best_release_from_list( $owner, $repo, array $args, $request_nonce ) {
 		$url = sprintf(
-			'https://api.github.com/repos/%s/%s/releases?per_page=20&rawatwp_cache=%d',
+			'https://api.github.com/repos/%s/%s/releases?per_page=50&rawatwp_cache=%s',
 			$owner,
 			$repo,
-			time()
+			rawurlencode( (string) $request_nonce )
 		);
 
 		$response = wp_remote_get( $url, $args );
@@ -633,6 +636,49 @@ class GitHubUpdater {
 		$repo  = (string) $this->settings['repo'];
 
 		return self::TRANSIENT_RELEASE_PREFIX . md5( strtolower( $owner . '/' . $repo ) );
+	}
+
+	/**
+	 * Build request nonce to defeat intermediary caching.
+	 *
+	 * @param bool $force_refresh Is forced refresh.
+	 * @return string
+	 */
+	private function build_request_nonce( $force_refresh ) {
+		$suffix = wp_rand( 100000, 999999 );
+		if ( $force_refresh ) {
+			return (string) gmdate( 'YmdHis' ) . '-' . $suffix . '-force';
+		}
+
+		return (string) gmdate( 'YmdHi' ) . '-' . $suffix;
+	}
+
+	/**
+	 * Hard reset WordPress/plugin update caches.
+	 *
+	 * @return void
+	 */
+	private function hard_reset_update_caches() {
+		delete_transient( $this->get_release_cache_key() );
+
+		delete_site_transient( 'update_plugins' );
+		delete_site_option( '_site_transient_update_plugins' );
+		delete_site_option( '_site_transient_timeout_update_plugins' );
+		delete_option( '_site_transient_update_plugins' );
+		delete_option( '_site_transient_timeout_update_plugins' );
+
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( 'update_plugins', 'site-transient' );
+			wp_cache_delete( 'update_plugins', 'transient' );
+		}
+
+		if ( function_exists( 'wp_clean_update_cache' ) ) {
+			wp_clean_update_cache();
+		}
+
+		if ( function_exists( 'wp_clean_plugins_cache' ) ) {
+			wp_clean_plugins_cache( true );
+		}
 	}
 
 	/**
