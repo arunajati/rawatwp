@@ -9,7 +9,7 @@ class Database {
 	/**
 	 * Schema version for db migrations.
 	 */
-	const SCHEMA_VERSION = '1.3.0';
+	const SCHEMA_VERSION = '1.4.0';
 
 	/**
 	 * Option key for schema version.
@@ -64,6 +64,8 @@ class Database {
 			label VARCHAR(191) NOT NULL,
 			type VARCHAR(20) NOT NULL,
 			target_slug VARCHAR(191) NOT NULL,
+			source_type VARCHAR(30) NOT NULL DEFAULT 'direct',
+			source_name VARCHAR(255) NULL,
 			file_name VARCHAR(255) NOT NULL,
 			file_path TEXT NOT NULL,
 			file_hash VARCHAR(128) NOT NULL,
@@ -71,7 +73,8 @@ class Database {
 			created_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY type (type),
-			KEY target_slug (target_slug)
+			KEY target_slug (target_slug),
+			KEY source_type (source_type)
 		) {$charset_collate};";
 
 		$logs_sql = "CREATE TABLE {$logs_table} (
@@ -345,13 +348,15 @@ class Database {
 				'label'       => sanitize_text_field( $data['label'] ),
 				'type'        => sanitize_key( $data['type'] ),
 				'target_slug' => sanitize_title( $data['target_slug'] ),
+				'source_type' => isset( $data['source_type'] ) ? sanitize_key( $data['source_type'] ) : 'direct',
+				'source_name' => isset( $data['source_name'] ) ? sanitize_file_name( $data['source_name'] ) : null,
 				'file_name'   => sanitize_file_name( $data['file_name'] ),
 				'file_path'   => sanitize_text_field( $data['file_path'] ),
 				'file_hash'   => sanitize_text_field( $data['file_hash'] ),
 				'uploaded_by' => get_current_user_id(),
 				'created_at'  => current_time( 'mysql' ),
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s' )
 		);
 
 		if ( false === $inserted ) {
@@ -371,7 +376,11 @@ class Database {
 
 		$rows = $wpdb->get_results( "SELECT * FROM {$this->table( 'packages' )} ORDER BY created_at DESC", ARRAY_A );
 
-		return is_array( $rows ) ? $rows : array();
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		return array_map( array( $this, 'hydrate_package_row' ), $rows );
 	}
 
 	/**
@@ -388,7 +397,7 @@ class Database {
 			ARRAY_A
 		);
 
-		return is_array( $row ) ? $row : null;
+		return is_array( $row ) ? $this->hydrate_package_row( $row ) : null;
 	}
 
 	/**
@@ -410,7 +419,7 @@ class Database {
 			ARRAY_A
 		);
 
-		return is_array( $row ) ? $row : null;
+		return is_array( $row ) ? $this->hydrate_package_row( $row ) : null;
 	}
 
 	/**
@@ -917,6 +926,23 @@ class Database {
 	 */
 	private function hydrate_site_row( array $row ) {
 		$row['last_report'] = ! empty( $row['last_report'] ) ? json_decode( $row['last_report'], true ) : array();
+
+		return $row;
+	}
+
+	/**
+	 * Prepare package row defaults.
+	 *
+	 * @param array $row Raw row.
+	 * @return array
+	 */
+	private function hydrate_package_row( array $row ) {
+		$row['source_type'] = isset( $row['source_type'] ) ? sanitize_key( (string) $row['source_type'] ) : 'direct';
+		if ( '' === $row['source_type'] ) {
+			$row['source_type'] = 'direct';
+		}
+
+		$row['source_name'] = isset( $row['source_name'] ) ? sanitize_file_name( (string) $row['source_name'] ) : '';
 
 		return $row;
 	}

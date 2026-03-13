@@ -97,6 +97,8 @@ class PackageManager {
 		$type        = $detected['type'];
 		$target_slug = $detected['target_slug'];
 		$label       = $detected['label'];
+		$source_type = $this->resolve_source_type( $detected, $from_bundle );
+		$source_name = sanitize_file_name( wp_basename( (string) $source_file_name ) );
 
 		$hash       = hash_file( 'sha256', $working_zip_path );
 		if ( ! is_string( $hash ) || '' === $hash ) {
@@ -146,6 +148,8 @@ class PackageManager {
 				'label'       => $label,
 				'type'        => $type,
 				'target_slug' => $target_slug,
+				'source_type' => $source_type,
+				'source_name' => $source_name,
 				'file_name'   => $target_file_name,
 				'file_path'   => $target_path,
 				'file_hash'   => $hash,
@@ -169,6 +173,8 @@ class PackageManager {
 					'package_id' => $package_id,
 					'file_name'  => $target_file_name,
 					'from_bundle' => $from_bundle,
+					'source_type' => $source_type,
+					'source_name' => $source_name,
 				),
 			)
 		);
@@ -244,6 +250,8 @@ class PackageManager {
 			$working_zip_path = isset( $prepared['zip_path'] ) ? wp_normalize_path( (string) $prepared['zip_path'] ) : $file_path;
 			$from_bundle      = ! empty( $prepared['from_bundle'] );
 			$source_name      = isset( $prepared['source_name'] ) ? (string) $prepared['source_name'] : basename( $file_path );
+			$source_type      = $this->resolve_source_type( $detected, $from_bundle );
+			$source_file_name = sanitize_file_name( basename( $file_path ) );
 
 			$file_hash = hash_file( 'sha256', $working_zip_path );
 			if ( ! is_string( $file_hash ) || '' === $file_hash ) {
@@ -299,6 +307,8 @@ class PackageManager {
 					'label'       => $detected['label'],
 					'type'        => $detected['type'],
 					'target_slug' => $detected['target_slug'],
+					'source_type' => $source_type,
+					'source_name' => $source_file_name,
 					'file_name'   => $store_name,
 					'file_path'   => $store_path,
 					'file_hash'   => $file_hash,
@@ -325,6 +335,8 @@ class PackageManager {
 				'type'        => $detected['type'],
 				'target_slug' => $detected['target_slug'],
 				'from_bundle' => $from_bundle,
+				'source_type' => $source_type,
+				'source_name' => $source_file_name,
 			);
 
 			$this->logger->log(
@@ -338,6 +350,8 @@ class PackageManager {
 					'context'   => array(
 						'file_path'   => $store_path,
 						'from_bundle' => $from_bundle,
+						'source_type' => $source_type,
+						'source_name' => $source_file_name,
 					),
 				)
 			);
@@ -856,6 +870,7 @@ class PackageManager {
 			'type'        => $type,
 			'target_slug' => $target_slug,
 			'label'       => $label,
+			'source_type' => isset( $meta['source_type'] ) ? sanitize_key( $meta['source_type'] ) : 'direct',
 		);
 	}
 
@@ -974,6 +989,7 @@ class PackageManager {
 				'type'        => 'core',
 				'target_slug' => 'wordpress-core',
 				'label'       => $label,
+				'source_type' => 'direct',
 			);
 		}
 
@@ -983,6 +999,7 @@ class PackageManager {
 				'type'        => 'theme',
 				'target_slug' => $theme_slug,
 				'label'       => $label,
+				'source_type' => 'direct',
 			);
 		}
 
@@ -992,6 +1009,7 @@ class PackageManager {
 				'type'        => 'plugin',
 				'target_slug' => $plugin_slug,
 				'label'       => $label,
+				'source_type' => 'direct',
 			);
 		}
 
@@ -1001,6 +1019,7 @@ class PackageManager {
 				'type'        => 'theme',
 				'target_slug' => $theme_patch_slug,
 				'label'       => $label,
+				'source_type' => 'patch_source',
 			);
 		}
 
@@ -1010,6 +1029,7 @@ class PackageManager {
 				'type'        => 'plugin',
 				'target_slug' => $plugin_patch_slug,
 				'label'       => $label,
+				'source_type' => 'patch_source',
 			);
 		}
 
@@ -1018,6 +1038,7 @@ class PackageManager {
 				'type'        => 'core',
 				'target_slug' => 'wordpress-core',
 				'label'       => $label,
+				'source_type' => 'direct',
 			);
 		}
 
@@ -1025,7 +1046,28 @@ class PackageManager {
 			'type'        => '',
 			'target_slug' => '',
 			'label'       => $label,
+			'source_type' => 'direct',
 		);
+	}
+
+	/**
+	 * Resolve package source type for storage.
+	 *
+	 * @param array $detected Detected package meta.
+	 * @param bool  $from_bundle Whether package comes from nested bundle.
+	 * @return string
+	 */
+	private function resolve_source_type( array $detected, $from_bundle ) {
+		if ( $from_bundle ) {
+			return 'patch_bundle';
+		}
+
+		$source_type = isset( $detected['source_type'] ) ? sanitize_key( (string) $detected['source_type'] ) : 'direct';
+		if ( ! in_array( $source_type, array( 'direct', 'patch_source', 'patch_bundle' ), true ) ) {
+			return 'direct';
+		}
+
+		return $source_type;
 	}
 
 	/**

@@ -617,6 +617,7 @@ class AdminPages {
 							<th>ID</th>
 							<th>Label</th>
 							<th>Type</th>
+							<th>Source</th>
 							<th>Target Slug</th>
 							<th>File</th>
 							<th>Uploaded At</th>
@@ -627,7 +628,7 @@ class AdminPages {
 						<?php $packages = $this->package_manager->get_packages(); ?>
 						<?php if ( empty( $packages ) ) : ?>
 							<tr>
-								<td colspan="8">No packages yet.</td>
+								<td colspan="9">No packages yet.</td>
 							</tr>
 						<?php else : ?>
 							<?php foreach ( $packages as $package ) : ?>
@@ -644,6 +645,7 @@ class AdminPages {
 									<td><?php echo esc_html( (string) $package['id'] ); ?></td>
 									<td><?php echo esc_html( $this->format_package_label_for_display( $package ) ); ?></td>
 									<td><?php echo esc_html( $this->format_package_type_for_display( isset( $package['type'] ) ? (string) $package['type'] : '' ) ); ?></td>
+									<td><?php echo esc_html( $this->format_package_source_for_display( $package ) ); ?></td>
 									<td><?php echo esc_html( $package['target_slug'] ); ?></td>
 									<td><?php echo esc_html( $this->format_package_file_name_for_display( $package ) ); ?></td>
 									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $package['created_at'] ) ? $package['created_at'] : '' ) ); ?></td>
@@ -1228,7 +1230,7 @@ class AdminPages {
 								<select name="package_id" required>
 									<option value="">Select package</option>
 									<?php foreach ( $packages as $package ) : ?>
-										<option value="<?php echo esc_attr( (string) $package['id'] ); ?>"><?php echo esc_html( $this->format_package_label_for_display( $package ) . ' (' . $this->format_package_type_for_display( isset( $package['type'] ) ? (string) $package['type'] : '' ) . ' / ' . $package['target_slug'] . ')' ); ?></option>
+										<option value="<?php echo esc_attr( (string) $package['id'] ); ?>"><?php echo esc_html( $this->format_package_label_for_display( $package ) . ' (' . $this->format_package_type_for_display( isset( $package['type'] ) ? (string) $package['type'] : '' ) . ' / ' . $package['target_slug'] . ' / ' . $this->format_package_source_for_display( $package ) . ')' ); ?></option>
 									<?php endforeach; ?>
 								</select>
 							</td>
@@ -2125,6 +2127,27 @@ class AdminPages {
 		}
 
 		return ucfirst( $type );
+	}
+
+	/**
+	 * Format package source for user-facing UI.
+	 *
+	 * @param array $package Package row.
+	 * @return string
+	 */
+	private function format_package_source_for_display( array $package ) {
+		$source_type = isset( $package['source_type'] ) ? sanitize_key( (string) $package['source_type'] ) : 'direct';
+		$source_name = isset( $package['source_name'] ) ? sanitize_file_name( (string) $package['source_name'] ) : '';
+
+		if ( 'patch_bundle' === $source_type ) {
+			return '' !== $source_name ? 'Patch Source (' . $source_name . ')' : 'Patch Source';
+		}
+
+		if ( 'patch_source' === $source_type ) {
+			return 'Patch Source';
+		}
+
+		return 'Direct';
 	}
 
 	/**
