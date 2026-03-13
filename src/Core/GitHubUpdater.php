@@ -41,10 +41,12 @@ class GitHubUpdater {
 	 * @return void
 	 */
 	public function init() {
+		add_filter( 'site_transient_update_plugins', array( $this, 'inject_update' ), 20 );
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'inject_update' ) );
 		add_filter( 'plugins_api', array( $this, 'plugins_api' ), 10, 3 );
 		add_filter( 'http_request_args', array( $this, 'filter_http_request_args' ), 10, 2 );
 		add_filter( 'upgrader_source_selection', array( $this, 'normalize_plugin_folder_name' ), 10, 4 );
+		add_action( 'upgrader_process_complete', array( $this, 'handle_upgrader_process_complete' ), 10, 2 );
 	}
 
 	/**
@@ -151,9 +153,17 @@ class GitHubUpdater {
 		$plugin_file   = plugin_basename( RAWATWP_FILE );
 		$remote_version = sanitize_text_field( (string) $release['version'] );
 
+		if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
+			$transient->response = array();
+		}
+
+		if ( ! isset( $transient->no_update ) || ! is_array( $transient->no_update ) ) {
+			$transient->no_update = array();
+		}
+
 		if ( version_compare( $remote_version, RAWATWP_VERSION, '<=' ) ) {
-			if ( ! isset( $transient->no_update ) || ! is_array( $transient->no_update ) ) {
-				$transient->no_update = array();
+			if ( isset( $transient->response[ $plugin_file ] ) ) {
+				unset( $transient->response[ $plugin_file ] );
 			}
 
 			$transient->no_update[ $plugin_file ] = (object) array(
@@ -168,8 +178,8 @@ class GitHubUpdater {
 			return $transient;
 		}
 
-		if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
-			$transient->response = array();
+		if ( isset( $transient->no_update[ $plugin_file ] ) ) {
+			unset( $transient->no_update[ $plugin_file ] );
 		}
 
 		$transient->response[ $plugin_file ] = (object) array(
@@ -184,6 +194,49 @@ class GitHubUpdater {
 		);
 
 		return $transient;
+	}
+
+	/**
+	 * Clean plugin update cache after upgrader runs.
+	 *
+	 * @param \WP_Upgrader $upgrader Upgrader instance.
+	 * @param array        $hook_extra Hook extra payload.
+	 * @return void
+	 */
+	public function handle_upgrader_process_complete( $upgrader, $hook_extra ) {
+		unset( $upgrader );
+
+		if ( ! is_array( $hook_extra ) ) {
+			return;
+		}
+
+		if ( empty( $hook_extra['type'] ) || 'plugin' !== $hook_extra['type'] ) {
+			return;
+		}
+
+		$plugins = array();
+		if ( ! empty( $hook_extra['plugins'] ) && is_array( $hook_extra['plugins'] ) ) {
+			$plugins = array_map( 'strval', $hook_extra['plugins'] );
+		}
+		if ( ! empty( $hook_extra['plugin'] ) ) {
+			$plugins[] = (string) $hook_extra['plugin'];
+		}
+
+		$plugin_file = plugin_basename( RAWATWP_FILE );
+		if ( ! in_array( $plugin_file, $plugins, true ) ) {
+			return;
+		}
+
+		$this->flush_release_cache();
+		delete_site_transient( 'update_plugins' );
+		if ( function_exists( 'wp_clean_plugins_cache' ) ) {
+			wp_clean_plugins_cache( true );
+		}
+
+		if ( ! function_exists( 'wp_update_plugins' ) ) {
+			require_once ABSPATH . 'wp-includes/update.php';
+		}
+		wp_update_plugins();
 	}
 
 	/**

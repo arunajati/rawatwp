@@ -560,7 +560,7 @@ class AdminPages {
 						<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
 						<input type="hidden" name="action" value="rawatwp_upload_package" />
 						<div class="rawatwp-upload-stack">
-							<label for="rawatwp-package-zip-input"><strong>Choose zip file</strong></label>
+							<label for="rawatwp-package-zip-input" class="rawatwp-upload-title">Choose Package</label>
 							<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 							<p id="rawatwp-upload-file-count" class="description"></p>
 							<div id="rawatwp-selected-files" class="rawatwp-selected-files" hidden>

@@ -191,6 +191,13 @@
 	margin-bottom: var(--rawatwp-space-1);
 }
 
+.rawatwp-admin .rawatwp-upload-stack label.rawatwp-upload-title {
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.3;
+	margin-bottom: var(--rawatwp-space-2);
+}
+
 .rawatwp-admin .rawatwp-upload-stack input[type="file"] {
 	display: inline-block;
 	margin-bottom: var(--rawatwp-space-1);
