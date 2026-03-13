@@ -240,28 +240,23 @@ class AdminPages {
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<?php wp_nonce_field( 'rawatwp_save_general_settings' ); ?>
 					<input type="hidden" name="action" value="rawatwp_save_general_settings" />
-					<table class="form-table" role="presentation">
-						<tr>
-							<th scope="row"><label for="rawatwp_mode">Active Mode</label></th>
-							<td>
-								<select id="rawatwp_mode" name="rawatwp_mode">
-									<option value="">Select Mode</option>
-									<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
-									<option value="child" <?php selected( $mode, 'child' ); ?>>Child</option>
-								</select>
-								<p class="description">Select one mode:<br />- Master (update provider)<br />- Child (update receiver)</p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row">Delete Data on Uninstall</th>
-							<td>
-								<label>
-									<input type="checkbox" name="delete_all_on_uninstall" value="1" <?php checked( $delete_all_on_uninstall ); ?> />
-									Fully Remove Data
-								</label>
-							</td>
-						</tr>
-					</table>
+					<div class="rawatwp-field-stack">
+						<p class="rawatwp-field-group">
+							<label for="rawatwp_mode"><strong>Active Mode</strong></label>
+							<select id="rawatwp_mode" name="rawatwp_mode">
+								<option value="">Select Mode</option>
+								<option value="master" <?php selected( $mode, 'master' ); ?>>Master</option>
+								<option value="child" <?php selected( $mode, 'child' ); ?>>Child</option>
+							</select>
+						</p>
+						<p class="rawatwp-field-group">
+							<label><strong>Uninstall Options</strong></label>
+							<label>
+								<input type="checkbox" name="delete_all_on_uninstall" value="1" <?php checked( $delete_all_on_uninstall ); ?> />
+								Clean Uninstall
+							</label>
+						</p>
+					</div>
 					<?php submit_button( 'Save Settings' ); ?>
 				</form>
 

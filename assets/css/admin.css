@@ -116,6 +116,10 @@
 	max-width: 520px;
 }
 
+.rawatwp-admin .rawatwp-field-group select {
+	min-width: 220px;
+}
+
 .rawatwp-admin .description {
 	color: #646970;
 }
