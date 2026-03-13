@@ -250,6 +250,38 @@
 	word-break: break-word;
 }
 
+.rawatwp-admin .rawatwp-selected-files-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-height: 30px;
+	padding: 0 12px;
+	border: 1px solid #d63638;
+	border-radius: 999px;
+	background: #fff5f5;
+	color: #b32d2e !important;
+	font-weight: 600;
+	line-height: 1;
+	text-decoration: none;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.rawatwp-admin .rawatwp-selected-files-remove::before {
+	content: "x";
+	font-size: 12px;
+	line-height: 1;
+	opacity: 0.75;
+}
+
+.rawatwp-admin .rawatwp-selected-files-remove:hover,
+.rawatwp-admin .rawatwp-selected-files-remove:focus {
+	background: #ffe9e9;
+	border-color: #b32d2e;
+	color: #8a2424 !important;
+}
+
 .rawatwp-admin .rawatwp-upload-monitor {
 	position: fixed;
 	right: 24px;
