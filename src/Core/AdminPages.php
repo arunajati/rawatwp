@@ -1812,14 +1812,16 @@ class AdminPages {
 		$snapshot  = isset( $result['snapshot'] ) && is_array( $result['snapshot'] ) ? $result['snapshot'] : array();
 		$themes    = isset( $snapshot['counts']['themes'] ) ? (int) $snapshot['counts']['themes'] : 0;
 		$plugins   = isset( $snapshot['counts']['plugins'] ) ? (int) $snapshot['counts']['plugins'] : 0;
+		$total     = isset( $snapshot['counts']['total'] ) ? (int) $snapshot['counts']['total'] : ( $themes + $plugins );
 		$core_text = ( isset( $snapshot['core']['needs_update'] ) && ! empty( $snapshot['core']['needs_update'] ) ) ? 'needs update' : 'up to date';
 
 		$notice = sprintf(
-			'Update check completed for %s. Core: %s, Themes: %d, Plugins: %d.',
+			'Update check completed for %s. Core: %s, Themes: %d, Plugins: %d, Total: %d.',
 			$site_name,
 			$core_text,
 			$themes,
-			$plugins
+			$plugins,
+			$total
 		);
 
 		$url = add_query_arg(
@@ -1860,12 +1862,28 @@ class AdminPages {
 		$success_count = isset( $summary['success'] ) && is_array( $summary['success'] ) ? count( $summary['success'] ) : 0;
 		$failed_count  = isset( $summary['failed'] ) && is_array( $summary['failed'] ) ? count( $summary['failed'] ) : 0;
 		$total_count   = $success_count + $failed_count;
+		$pending_total = 0;
+		$sites_with_updates = 0;
+		if ( ! empty( $summary['success'] ) && is_array( $summary['success'] ) ) {
+			foreach ( $summary['success'] as $success_item ) {
+				if ( ! is_array( $success_item ) || empty( $success_item['snapshot'] ) || ! is_array( $success_item['snapshot'] ) ) {
+					continue;
+				}
+				$snapshot_total = isset( $success_item['snapshot']['counts']['total'] ) ? (int) $success_item['snapshot']['counts']['total'] : 0;
+				if ( $snapshot_total > 0 ) {
+					++$sites_with_updates;
+					$pending_total += $snapshot_total;
+				}
+			}
+		}
 
 		$notice = sprintf(
-			'Manual update check finished for %d site(s). Success: %d, Failed: %d.',
+			'Update check finished for %d site(s). Success: %d, Failed: %d, Sites with updates: %d, Pending items: %d.',
 			$total_count,
 			$success_count,
-			$failed_count
+			$failed_count,
+			$sites_with_updates,
+			$pending_total
 		);
 		$error = '';
 		if ( $failed_count > 0 ) {

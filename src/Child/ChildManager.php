@@ -551,11 +551,34 @@ class ChildManager {
 		if ( ! function_exists( 'get_plugins' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
+		if ( ! function_exists( 'set_current_screen' ) && file_exists( ABSPATH . 'wp-admin/includes/screen.php' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/screen.php';
+		}
+
+		$had_current_screen = array_key_exists( 'current_screen', $GLOBALS );
+		$previous_screen    = $had_current_screen ? $GLOBALS['current_screen'] : null;
+
+		if ( function_exists( 'set_current_screen' ) ) {
+			set_current_screen( 'dashboard' );
+		}
 
 		if ( $force_refresh ) {
-			wp_version_check( array(), true );
-			wp_update_plugins();
-			wp_update_themes();
+			if ( function_exists( 'wp_clean_update_cache' ) ) {
+				wp_clean_update_cache();
+			}
+			delete_site_transient( 'update_core' );
+			delete_site_transient( 'update_plugins' );
+			delete_site_transient( 'update_themes' );
+		}
+
+		wp_version_check( array(), true );
+		wp_update_plugins();
+		wp_update_themes();
+
+		if ( $had_current_screen ) {
+			$GLOBALS['current_screen'] = $previous_screen;
+		} else {
+			unset( $GLOBALS['current_screen'] );
 		}
 
 		$current_wp_version = sanitize_text_field( (string) get_bloginfo( 'version' ) );
