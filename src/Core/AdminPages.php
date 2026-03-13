@@ -182,6 +182,7 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_queue_pause_toggle', array( $this, 'handle_queue_pause_toggle' ) );
 		add_action( 'admin_post_rawatwp_regenerate_runner_token', array( $this, 'handle_regenerate_runner_token' ) );
 
+		add_action( 'wp_ajax_rawatwp_upload_package_item', array( $this, 'handle_ajax_upload_package_item' ) );
 		add_action( 'wp_ajax_rawatwp_queue_process_next', array( $this, 'handle_ajax_queue_process_next' ) );
 		add_action( 'wp_ajax_rawatwp_queue_status', array( $this, 'handle_ajax_queue_status' ) );
 	}
@@ -562,12 +563,18 @@ class AdminPages {
 							<label for="rawatwp-package-zip-input"><strong>Choose zip file</strong></label>
 							<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 							<p id="rawatwp-upload-file-count" class="description"></p>
-							<p id="rawatwp-upload-progress-wrap" class="rawatwp-upload-progress">
-								Upload progress: <strong id="rawatwp-upload-progress-value">0%</strong>
-							</p>
 						</div>
 						<?php submit_button( 'Upload zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
 					</form>
+
+					<div id="rawatwp-upload-monitor" class="rawatwp-upload-monitor" hidden>
+						<div class="rawatwp-upload-monitor-header">
+							<strong>Upload Monitor</strong>
+							<button id="rawatwp-upload-monitor-close" type="button" class="button-link">Close</button>
+						</div>
+						<p id="rawatwp-upload-summary" class="rawatwp-upload-summary">Waiting for upload...</p>
+						<div id="rawatwp-upload-items" class="rawatwp-upload-items"></div>
+					</div>
 				</div>
 
 				<div class="rawatwp-card">
@@ -643,10 +650,99 @@ class AdminPages {
 					</table>
 				</div>
 
-					<script>
-					(function() {
+				<script>
+				(function() {
 					var checkAll = document.getElementById('rawatwp-check-all-packages');
 					var rowChecks = document.querySelectorAll('.rawatwp-package-check');
+					var uploadForm = document.getElementById('rawatwp-package-upload-form');
+					var fileInput = document.getElementById('rawatwp-package-zip-input');
+					var submitButton = document.getElementById('rawatwp-upload-submit');
+					var fileCountInfo = document.getElementById('rawatwp-upload-file-count');
+					var uploadMonitor = document.getElementById('rawatwp-upload-monitor');
+					var uploadSummary = document.getElementById('rawatwp-upload-summary');
+					var uploadItems = document.getElementById('rawatwp-upload-items');
+					var closeMonitorBtn = document.getElementById('rawatwp-upload-monitor-close');
+					var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+					var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'rawatwp_upload_package_item' ) ); ?>;
+					var uploadedRows = [];
+
+					function setSummary(text) {
+						if (uploadSummary) {
+							uploadSummary.textContent = text;
+						}
+					}
+
+					function createUploadRow(fileName) {
+						if (!uploadItems) {
+							return null;
+						}
+						var row = document.createElement('div');
+						row.className = 'rawatwp-upload-item';
+						row.innerHTML = '' +
+							'<div class=\"rawatwp-upload-item-head\">' +
+								'<span class=\"rawatwp-upload-item-name\"></span>' +
+								'<span class=\"rawatwp-upload-item-status\">Queued</span>' +
+							'</div>' +
+							'<div class=\"rawatwp-upload-item-bar-wrap\">' +
+								'<div class=\"rawatwp-upload-item-bar\"></div>' +
+							'</div>' +
+							'<div class=\"rawatwp-upload-item-percent\">0.00%</div>';
+
+						row.querySelector('.rawatwp-upload-item-name').textContent = fileName;
+						uploadItems.appendChild(row);
+
+						return row;
+					}
+
+					function updateUploadRow(row, percent, status, state) {
+						if (!row) {
+							return;
+						}
+
+						var safePercent = Math.max(0, Math.min(100, Number(percent || 0)));
+						var percentText = safePercent.toFixed(2) + '%';
+						var statusEl = row.querySelector('.rawatwp-upload-item-status');
+						var barEl = row.querySelector('.rawatwp-upload-item-bar');
+						var percentEl = row.querySelector('.rawatwp-upload-item-percent');
+
+						row.classList.remove('is-queued', 'is-uploading', 'is-validating', 'is-saving', 'is-success', 'is-failed');
+						row.classList.add('is-' + state);
+
+						if (statusEl) {
+							statusEl.textContent = status;
+						}
+						if (barEl) {
+							barEl.style.width = percentText;
+						}
+						if (percentEl) {
+							percentEl.textContent = percentText;
+						}
+					}
+
+					function parseErrorMessage(xhr) {
+						try {
+							var payload = JSON.parse(xhr.responseText || '{}');
+							if (payload && payload.data && payload.data.message) {
+								return payload.data.message;
+							}
+						} catch (e) {}
+						if (xhr.status === 413) {
+							return 'Upload failed: file is too large for server limit.';
+						}
+						if (xhr.status >= 500) {
+							return 'Upload failed: server error.';
+						}
+						return 'Upload failed: unexpected response.';
+					}
+
+					if (closeMonitorBtn && uploadMonitor && uploadForm) {
+						closeMonitorBtn.addEventListener('click', function() {
+							if ('1' === uploadForm.getAttribute('data-uploading')) {
+								return;
+							}
+							uploadMonitor.hidden = true;
+						});
+					}
 
 					if (checkAll) {
 						checkAll.addEventListener('change', function() {
@@ -656,78 +752,183 @@ class AdminPages {
 						});
 					}
 
-					var uploadForm = document.getElementById('rawatwp-package-upload-form');
-					if (!uploadForm || !window.XMLHttpRequest) {
+					if (!uploadForm || !window.XMLHttpRequest || !fileInput || !submitButton) {
 						return;
 					}
 
-						var progressWrap = document.getElementById('rawatwp-upload-progress-wrap');
-						var progressValue = document.getElementById('rawatwp-upload-progress-value');
-						var fileCountInfo = document.getElementById('rawatwp-upload-file-count');
-						var submitButton = document.getElementById('rawatwp-upload-submit');
-						var uploadUrl = uploadForm.getAttribute('action') || '';
-						var fileInput = document.getElementById('rawatwp-package-zip-input');
-
-						if (fileInput && fileCountInfo) {
-							fileInput.addEventListener('change', function() {
-								var count = fileInput.files ? fileInput.files.length : 0;
-								fileCountInfo.textContent = count > 0 ? (count + ' file(s) selected') : '';
-							});
+					fileInput.addEventListener('change', function() {
+						var count = fileInput.files ? fileInput.files.length : 0;
+						if (fileCountInfo) {
+							fileCountInfo.textContent = count > 0 ? (count + ' file(s) selected') : '';
 						}
+					});
 
-						uploadForm.addEventListener('submit', function(event) {
-							if ('1' === uploadForm.getAttribute('data-uploading')) {
-								event.preventDefault();
-								return;
-							}
-
-							if (!fileInput || !fileInput.files || !fileInput.files.length) {
-								return;
-							}
+					uploadForm.addEventListener('submit', function(event) {
+						var files = fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
+						if ('1' === uploadForm.getAttribute('data-uploading')) {
+							event.preventDefault();
+							return;
+						}
+						if (!files.length) {
+							return;
+						}
 
 						event.preventDefault();
 						uploadForm.setAttribute('data-uploading', '1');
+						submitButton.disabled = true;
 
-						if (submitButton) {
-							submitButton.disabled = true;
+						if (uploadMonitor) {
+							uploadMonitor.hidden = false;
+						}
+						if (uploadItems) {
+							uploadItems.innerHTML = '';
 						}
 
-						if (progressWrap) {
-							progressWrap.style.display = 'block';
-						}
-
-						var xhr = new XMLHttpRequest();
-						xhr.open('POST', uploadUrl, true);
-
-						xhr.upload.addEventListener('progress', function(e) {
-							if (!e.lengthComputable || !progressValue) {
-								return;
-							}
-							var percent = Math.round((e.loaded / e.total) * 100);
-							progressValue.textContent = percent + '%';
+						var total = files.length;
+						var finished = 0;
+						var success = 0;
+						var failed = 0;
+						uploadedRows = files.map(function(file) {
+							return createUploadRow(file.name);
 						});
 
-							xhr.onload = function() {
-								if (progressValue) {
-									progressValue.textContent = '100%';
-								}
-								var redirectTo = xhr.responseURL ? xhr.responseURL : '';
-								if (redirectTo) {
-									window.location.href = redirectTo;
+						setSummary('Preparing upload...');
+
+						function refreshSummary() {
+							var overall = total > 0 ? (finished / total) * 100 : 0;
+							setSummary(
+								'Total: ' + total +
+								' | Completed: ' + finished +
+								' | Success: ' + success +
+								' | Failed: ' + failed +
+								' | Overall: ' + overall.toFixed(2) + '%'
+							);
+						}
+
+						function finishBatch() {
+							uploadForm.removeAttribute('data-uploading');
+							submitButton.disabled = false;
+							refreshSummary();
+
+							if (success > 0) {
+								setSummary((failed > 0 ? 'Upload finished with some failures.' : 'Upload finished successfully.') + ' Refreshing package list...');
+								setTimeout(function() {
+									window.location.reload();
+								}, 1200);
+							}
+						}
+
+						function uploadFileAt(index) {
+							if (index >= files.length) {
+								finishBatch();
 								return;
 							}
-							window.location.reload();
-						};
 
-						xhr.onerror = function() {
-							uploadForm.removeAttribute('data-uploading');
-							if (submitButton) {
-								submitButton.disabled = false;
-							}
-							uploadForm.submit();
-						};
+							var file = files[index];
+							var row = uploadedRows[index];
+							var progressValue = 0;
+							var lastActivity = Date.now();
 
-						xhr.send(new FormData(uploadForm));
+							updateUploadRow(row, 0, 'Uploading...', 'uploading');
+							refreshSummary();
+
+							var xhr = new XMLHttpRequest();
+							xhr.open('POST', ajaxUrl, true);
+							xhr.timeout = 900000;
+
+							var stallWatcher = window.setInterval(function() {
+								if (Date.now() - lastActivity > 45000) {
+									window.clearInterval(stallWatcher);
+									xhr.abort();
+								}
+							}, 5000);
+
+							xhr.upload.addEventListener('progress', function(e) {
+								lastActivity = Date.now();
+								if (!e.lengthComputable) {
+									return;
+								}
+								progressValue = (e.loaded / e.total) * 100;
+								updateUploadRow(row, progressValue, 'Uploading...', 'uploading');
+							});
+
+							xhr.upload.addEventListener('load', function() {
+								lastActivity = Date.now();
+								updateUploadRow(row, 100, 'Validating...', 'validating');
+							});
+
+							xhr.onreadystatechange = function() {
+								lastActivity = Date.now();
+								if (xhr.readyState >= 3) {
+									updateUploadRow(row, 100, 'Saving...', 'saving');
+								}
+							};
+
+							xhr.onload = function() {
+								window.clearInterval(stallWatcher);
+								finished++;
+
+								var ok = false;
+								var message = '';
+								try {
+									var payload = JSON.parse(xhr.responseText || '{}');
+									if (xhr.status >= 200 && xhr.status < 300 && payload && payload.success) {
+										ok = true;
+										message = payload.data && payload.data.message ? payload.data.message : 'Uploaded successfully.';
+									} else {
+										message = payload && payload.data && payload.data.message ? payload.data.message : parseErrorMessage(xhr);
+									}
+								} catch (e) {
+									message = parseErrorMessage(xhr);
+								}
+
+								if (ok) {
+									success++;
+									updateUploadRow(row, 100, message, 'success');
+								} else {
+									failed++;
+									updateUploadRow(row, progressValue, message, 'failed');
+								}
+
+								refreshSummary();
+								uploadFileAt(index + 1);
+							};
+
+							xhr.onerror = function() {
+								window.clearInterval(stallWatcher);
+								finished++;
+								failed++;
+								updateUploadRow(row, progressValue, 'Upload failed: network error.', 'failed');
+								refreshSummary();
+								uploadFileAt(index + 1);
+							};
+
+							xhr.onabort = function() {
+								window.clearInterval(stallWatcher);
+								finished++;
+								failed++;
+								updateUploadRow(row, progressValue, 'Upload interrupted: no activity detected.', 'failed');
+								refreshSummary();
+								uploadFileAt(index + 1);
+							};
+
+							xhr.ontimeout = function() {
+								window.clearInterval(stallWatcher);
+								finished++;
+								failed++;
+								updateUploadRow(row, progressValue, 'Upload timeout: server did not respond in time.', 'failed');
+								refreshSummary();
+								uploadFileAt(index + 1);
+							};
+
+							var formData = new FormData();
+							formData.append('action', 'rawatwp_upload_package_item');
+							formData.append('_ajax_nonce', ajaxNonce);
+							formData.append('package_zip_item', file, file.name);
+							xhr.send(formData);
+						}
+
+						uploadFileAt(0);
 					});
 				})();
 				</script>
@@ -910,6 +1111,9 @@ class AdminPages {
 									$status_key   = isset( $row['status'] ) ? sanitize_key( (string) $row['status'] ) : '';
 									$status_label = isset( $status_labels[ $status_key ] ) ? $status_labels[ $status_key ] : ucfirst( $status_key );
 									$detail_text  = '';
+									$progress     = isset( $row['progress'] ) ? (float) $row['progress'] : 0.0;
+									$progress     = max( 0.0, min( 100.0, $progress ) );
+									$progress_txt = number_format( $progress, 2, '.', '' );
 									if ( 'failed' === $status_key ) {
 										$detail_text = '' !== (string) $row['message'] ? (string) $row['message'] : ( isset( $row['reason_code'] ) ? (string) $row['reason_code'] : '' );
 									}
@@ -925,9 +1129,9 @@ class AdminPages {
 										</td>
 											<td class="rawatwp-progress-cell">
 											<div class="rawatwp-progress-wrap">
-												<div class="rawatwp-progress-bar" style="width:<?php echo esc_attr( (string) max( 0, min( 100, (int) $row['progress'] ) ) ); ?>%;"></div>
+												<div class="rawatwp-progress-bar" style="width:<?php echo esc_attr( $progress_txt ); ?>%;"></div>
 											</div>
-											<?php echo esc_html( (string) (int) $row['progress'] ); ?>%
+											<?php echo esc_html( $progress_txt ); ?>%
 										</td>
 										<td><?php echo esc_html( $this->format_datetime_for_display( isset( $row['updated_at'] ) ? $row['updated_at'] : '' ) ); ?></td>
 									</tr>
@@ -1326,6 +1530,73 @@ class AdminPages {
 		}
 
 		$this->redirect_with_notice( 'rawatwp-packages', sprintf( '%d zip file(s) uploaded successfully.', $success ), '' );
+	}
+
+	/**
+	 * Handle single package upload via AJAX for per-file progress.
+	 *
+	 * @return void
+	 */
+	public function handle_ajax_upload_package_item() {
+		$this->assert_admin();
+		check_ajax_referer( 'rawatwp_upload_package_item' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			wp_send_json_error(
+				array(
+					'message' => 'This feature is available only in Master mode.',
+				),
+				403
+			);
+		}
+
+		if ( empty( $_FILES['package_zip_item'] ) || ! is_array( $_FILES['package_zip_item'] ) ) {
+			wp_send_json_error(
+				array(
+					'message' => 'Zip file not found.',
+				),
+				400
+			);
+		}
+
+		$file      = $_FILES['package_zip_item'];
+		$file_name = isset( $file['name'] ) ? sanitize_file_name( (string) $file['name'] ) : '';
+		$result    = $this->package_manager->upload_package( $file );
+
+		if ( is_wp_error( $result ) ) {
+			$this->logger->log(
+				array(
+					'mode'      => 'master',
+					'action'    => 'package_upload_failed',
+					'status'    => 'failed',
+					'item_type' => 'unknown',
+					'item_slug' => '',
+					'message'   => sprintf(
+						'Package upload failed%s: %s',
+						'' !== $file_name ? ' (' . $file_name . ')' : '',
+						$result->get_error_message()
+					),
+					'context'   => array(
+						'file_name' => $file_name,
+						'error'     => $result->get_error_code(),
+					),
+				)
+			);
+
+			wp_send_json_error(
+				array(
+					'message' => $result->get_error_message(),
+				),
+				400
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf( 'Uploaded successfully: %s', '' !== $file_name ? $file_name : 'zip file' ),
+				'package' => is_array( $result ) ? $result : array(),
+			)
+		);
 	}
 
 	/**

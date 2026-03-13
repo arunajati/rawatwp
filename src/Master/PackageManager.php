@@ -57,8 +57,9 @@ class PackageManager {
 			return new \WP_Error( 'rawatwp_no_file', __( 'Zip file is required.', 'rawatwp' ) );
 		}
 
-		if ( ! isset( $file['error'] ) || 0 !== (int) $file['error'] ) {
-			return new \WP_Error( 'rawatwp_upload_error', __( 'File upload failed.', 'rawatwp' ) );
+		$error_code = isset( $file['error'] ) ? (int) $file['error'] : UPLOAD_ERR_NO_FILE;
+		if ( 0 !== $error_code ) {
+			return new \WP_Error( 'rawatwp_upload_error', $this->get_upload_error_message( $error_code ) );
 		}
 
 		$extension = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
@@ -68,25 +69,30 @@ class PackageManager {
 
 		$packages_dir = $this->get_packages_directory();
 		if ( ! file_exists( $packages_dir ) ) {
-			wp_mkdir_p( $packages_dir );
-		}
-
-		$target_file_name = sprintf(
-			'%s-%s.zip',
-			gmdate( 'Ymd-His' ),
-			sanitize_file_name( wp_basename( $file['name'], '.zip' ) )
-		);
-
-		$target_path = trailingslashit( $packages_dir ) . $target_file_name;
-		if ( ! @move_uploaded_file( $file['tmp_name'], $target_path ) ) {
-			if ( ! @copy( $file['tmp_name'], $target_path ) ) {
-				return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to save zip file.', 'rawatwp' ) );
+			if ( ! wp_mkdir_p( $packages_dir ) ) {
+				return new \WP_Error( 'rawatwp_updates_dir_missing', __( 'Updates folder cannot be created.', 'rawatwp' ) );
 			}
 		}
 
-		$detected = $this->detect_package_meta_from_zip( $target_path );
+		$target_file_name = sprintf(
+			'%s-%s-%s.zip',
+			gmdate( 'Ymd-His' ),
+			sanitize_file_name( wp_basename( $file['name'], '.zip' ) ),
+			wp_generate_password( 6, false, false )
+		);
+
+		$target_path      = trailingslashit( $packages_dir ) . $target_file_name;
+		$target_temp_path = $target_path . '.part';
+
+		if ( ! @move_uploaded_file( $file['tmp_name'], $target_temp_path ) ) {
+			if ( ! @copy( $file['tmp_name'], $target_temp_path ) ) {
+				return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to save uploaded file.', 'rawatwp' ) );
+			}
+		}
+
+		$detected = $this->detect_package_meta_from_zip( $target_temp_path );
 		if ( is_wp_error( $detected ) ) {
-			@unlink( $target_path );
+			@unlink( $target_temp_path );
 			return $detected;
 		}
 
@@ -94,11 +100,16 @@ class PackageManager {
 		$target_slug = $detected['target_slug'];
 		$label       = $detected['label'];
 
-		$hash       = hash_file( 'sha256', $target_path );
+		$hash       = hash_file( 'sha256', $target_temp_path );
 		$existing   = $this->database->get_package_by_hash( $hash );
 		if ( $existing ) {
-			@unlink( $target_path );
+			@unlink( $target_temp_path );
 			return new \WP_Error( 'rawatwp_package_duplicate', __( 'This zip file is already registered.', 'rawatwp' ) );
+		}
+
+		if ( ! @rename( $target_temp_path, $target_path ) ) {
+			@unlink( $target_temp_path );
+			return new \WP_Error( 'rawatwp_move_failed', __( 'Failed to finalize uploaded file.', 'rawatwp' ) );
 		}
 
 		$package_id = $this->database->insert_package(
@@ -127,6 +138,7 @@ class PackageManager {
 				'message'   => sprintf( 'Package %s uploaded successfully.', $label ),
 				'context'   => array(
 					'package_id' => $package_id,
+					'file_name'  => $target_file_name,
 				),
 			)
 		);
@@ -194,7 +206,7 @@ class PackageManager {
 				$result['details'][] = array(
 					'file'   => basename( $file_path ),
 					'status' => 'skipped',
-					'reason' => 'Sudah terdaftar.',
+					'reason' => 'Already registered.',
 				);
 				continue;
 			}
@@ -432,6 +444,42 @@ class PackageManager {
 		$path = wp_normalize_path( (string) $path );
 
 		return 0 === strpos( $path, $base );
+	}
+
+	/**
+	 * Resolve upload error message from PHP upload error code.
+	 *
+	 * @param int $error_code Upload error code.
+	 * @return string
+	 */
+	private function get_upload_error_message( $error_code ) {
+		$error_code = (int) $error_code;
+
+		if ( UPLOAD_ERR_INI_SIZE === $error_code || UPLOAD_ERR_FORM_SIZE === $error_code ) {
+			return __( 'Upload failed: file exceeds server upload limit.', 'rawatwp' );
+		}
+
+		if ( UPLOAD_ERR_PARTIAL === $error_code ) {
+			return __( 'Upload interrupted: file was only partially uploaded.', 'rawatwp' );
+		}
+
+		if ( UPLOAD_ERR_NO_FILE === $error_code ) {
+			return __( 'Upload failed: no file was received.', 'rawatwp' );
+		}
+
+		if ( UPLOAD_ERR_NO_TMP_DIR === $error_code ) {
+			return __( 'Upload failed: temporary directory is missing on server.', 'rawatwp' );
+		}
+
+		if ( UPLOAD_ERR_CANT_WRITE === $error_code ) {
+			return __( 'Upload failed: server cannot write uploaded file.', 'rawatwp' );
+		}
+
+		if ( UPLOAD_ERR_EXTENSION === $error_code ) {
+			return __( 'Upload blocked by a server extension.', 'rawatwp' );
+		}
+
+		return __( 'File upload failed.', 'rawatwp' );
 	}
 
 	/**

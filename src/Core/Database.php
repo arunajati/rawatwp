@@ -9,7 +9,7 @@ class Database {
 	/**
 	 * Schema version for db migrations.
 	 */
-	const SCHEMA_VERSION = '1.2.0';
+	const SCHEMA_VERSION = '1.3.0';
 
 	/**
 	 * Option key for schema version.
@@ -97,7 +97,7 @@ class Database {
 			site_id BIGINT UNSIGNED NOT NULL,
 			package_id BIGINT UNSIGNED NOT NULL,
 			status VARCHAR(50) NOT NULL DEFAULT 'on_queue',
-			progress TINYINT UNSIGNED NOT NULL DEFAULT 0,
+			progress DECIMAL(5,2) NOT NULL DEFAULT 0.00,
 			message TEXT NULL,
 			reason_code VARCHAR(100) NULL,
 			attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
@@ -577,7 +577,7 @@ class Database {
 				'site_id'     => (int) $data['site_id'],
 				'package_id'  => (int) $data['package_id'],
 				'status'      => isset( $data['status'] ) ? sanitize_key( $data['status'] ) : 'on_queue',
-				'progress'    => isset( $data['progress'] ) ? (int) $data['progress'] : 0,
+				'progress'    => isset( $data['progress'] ) ? (float) $data['progress'] : 0.0,
 				'message'     => isset( $data['message'] ) ? sanitize_textarea_field( $data['message'] ) : null,
 				'reason_code' => isset( $data['reason_code'] ) ? sanitize_key( $data['reason_code'] ) : null,
 				'attempts'    => isset( $data['attempts'] ) ? max( 0, (int) $data['attempts'] ) : 0,
@@ -591,7 +591,7 @@ class Database {
 				'created_at'  => $now,
 				'updated_at'  => $now,
 			),
-			array( '%s', '%d', '%d', '%s', '%d', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%d', '%d', '%s', '%f', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $inserted ) {
@@ -624,8 +624,8 @@ class Database {
 			$format[]         = '%s';
 		}
 		if ( isset( $data['progress'] ) ) {
-			$fields['progress'] = max( 0, min( 100, (int) $data['progress'] ) );
-			$format[]           = '%d';
+			$fields['progress'] = max( 0, min( 100, (float) $data['progress'] ) );
+			$format[]           = '%f';
 		}
 		if ( array_key_exists( 'message', $data ) ) {
 			$fields['message'] = null === $data['message'] ? null : sanitize_textarea_field( $data['message'] );
@@ -737,7 +737,7 @@ class Database {
 				'id'     => $queue_id,
 				'status' => 'on_queue',
 			),
-			array( '%s', '%d', '%s', '%s', '%s', '%s', '%s' ),
+			array( '%s', '%f', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d', '%s' )
 		);
 
@@ -805,7 +805,7 @@ class Database {
 			$wpdb->prepare(
 				"UPDATE {$this->table( 'queue' )}
 				SET status = %s,
-					progress = %d,
+					progress = %f,
 					message = %s,
 					worker_id = NULL,
 					next_run_at = %s,
@@ -813,8 +813,8 @@ class Database {
 				WHERE status = %s
 					AND (heartbeat_at IS NULL OR heartbeat_at < %s)",
 				'on_queue',
-				0,
-				'Koneksi worker terputus. Tugas dijadwalkan ulang.',
+				0.0,
+				'Worker connection was interrupted. Task has been requeued.',
 				current_time( 'mysql' ),
 				current_time( 'mysql' ),
 				'processing',

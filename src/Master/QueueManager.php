@@ -115,7 +115,7 @@ class QueueManager {
 					'site_id'      => $site_id,
 					'package_id'   => (int) $package['id'],
 					'status'       => 'on_queue',
-					'progress'     => 0,
+					'progress'     => 0.0,
 					'message'      => 'Added to update queue.',
 					'reason_code'  => 'queued',
 					'attempts'     => 0,
@@ -300,7 +300,7 @@ class QueueManager {
 				$queue_id,
 				array(
 					'status'      => 'failed',
-					'progress'    => 100,
+					'progress'    => 100.0,
 					'reason_code' => 'invalid_target',
 					'message'     => 'Failed: site or package data was not found.',
 					'last_error'  => 'Site/package not found while processing.',
@@ -315,7 +315,7 @@ class QueueManager {
 		$this->database->update_queue_item(
 			$queue_id,
 			array(
-				'progress' => 30,
+				'progress' => 30.5,
 				'message'  => sprintf( 'Sending update command to %s.', $site['site_name'] ),
 			)
 		);
@@ -329,7 +329,7 @@ class QueueManager {
 				$queue_id,
 				array(
 					'status'      => 'success',
-					'progress'    => 100,
+					'progress'    => 100.0,
 					'reason_code' => 'ok',
 					'message'     => $message,
 					'last_error'  => null,
@@ -355,7 +355,7 @@ class QueueManager {
 				$queue_id,
 				array(
 					'status'      => 'on_queue',
-					'progress'    => 0,
+					'progress'    => 0.0,
 					'attempts'    => $attempts,
 					'reason_code' => $reason_code,
 					'message'     => sprintf( 'Temporary failure: %s. Retry %d/%d.', $message, $attempts + 1, $max_attempts ),
@@ -371,7 +371,7 @@ class QueueManager {
 			$queue_id,
 			array(
 				'status'      => 'failed',
-				'progress'    => 100,
+				'progress'    => 100.0,
 				'attempts'    => $attempts,
 				'reason_code' => $reason_code,
 				'message'     => sprintf( 'Update failed: %s', $message ),
@@ -429,4 +429,3 @@ class QueueManager {
 		delete_transient( self::LOCK_KEY );
 	}
 }
-
