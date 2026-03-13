@@ -1743,10 +1743,15 @@ class AdminPages {
 		}
 
 		$message = sprintf(
-			'RawatWP update queued for %d connected site(s). Batch: %s.',
-			count( $site_ids ),
-			isset( $result['batch_id'] ) ? (string) $result['batch_id'] : '-'
+			'RawatWP update request saved. %d connected site(s) are now in queue. Check "Update Progress" below.',
+			count( $site_ids )
 		);
+		if ( ! empty( $result['skipped'] ) ) {
+			$message .= ' ' . sprintf(
+				'%d item(s) were skipped because they were already in queue or not eligible.',
+				(int) $result['skipped']
+			);
+		}
 		$updates_url = add_query_arg(
 			array(
 				'page' => 'rawatwp-updates',
@@ -1994,6 +1999,10 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-updates', '', $result->get_error_message() );
 		}
 
+		$site_count = isset( $result['site_count'] ) ? (int) $result['site_count'] : count( $site_ids );
+		$queued     = isset( $result['queued'] ) ? (int) $result['queued'] : 0;
+		$skipped    = isset( $result['skipped'] ) ? (int) $result['skipped'] : 0;
+
 		if ( ! empty( $result['is_patch_sequence'] ) ) {
 			$numbers_text = '';
 			if ( ! empty( $result['patch_numbers'] ) && is_array( $result['patch_numbers'] ) ) {
@@ -2001,22 +2010,42 @@ class AdminPages {
 			}
 
 			$message = sprintf(
-				'Patch sequence queued. Batch: %s | Patch flow: %s | Sites: %d | Queue items: %d | Skipped: %d',
-				$result['batch_id'],
-				'' !== $numbers_text ? $numbers_text : '-',
-				isset( $result['site_count'] ) ? (int) $result['site_count'] : count( $site_ids ),
-				(int) $result['queued'],
-				(int) $result['skipped']
+				'Patch update request saved for %d site(s).',
+				$site_count
 			);
+			$message .= ' ' . sprintf(
+				'Total queued task(s): %d.',
+				$queued
+			);
+			if ( '' !== $numbers_text ) {
+				$message .= ' ' . sprintf(
+					'Patch order: %s.',
+					$numbers_text
+				);
+			}
+			$message .= ' Check "Update Progress" below.';
 		} else {
 			$message = sprintf(
-				'Queue created. Batch: %s | On queue: %d | Skipped: %d',
-				$result['batch_id'],
-				(int) $result['queued'],
-				(int) $result['skipped']
+				'Update request saved. %d site(s) are now in queue. Check "Update Progress" below.',
+				$queued
 			);
 		}
-		$this->redirect_with_notice( 'rawatwp-updates', $message, '' );
+
+		if ( $skipped > 0 ) {
+			$message .= ' ' . sprintf(
+				'%d item(s) were skipped because they were already in queue or not eligible.',
+				$skipped
+			);
+		}
+
+		$updates_url = add_query_arg(
+			array(
+				'page' => 'rawatwp-updates',
+			),
+			admin_url( 'admin.php' )
+		);
+		$updates_url .= '#rawatwp-update-progress';
+		$this->redirect_to_url_with_notice( $updates_url, $message, '' );
 	}
 
 	/**
