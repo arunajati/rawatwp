@@ -9,6 +9,7 @@ use RawatWP\Child\RollbackManager;
 use RawatWP\Child\UpdateEngine;
 use RawatWP\Core\AdminPages;
 use RawatWP\Core\ApiManager;
+use RawatWP\Core\Activator;
 use RawatWP\Core\Database;
 use RawatWP\Core\GitHubUpdater;
 use RawatWP\Core\Logger;
@@ -98,6 +99,7 @@ class Plugin {
 			add_action( 'rest_api_init', array( $this->api_manager, 'register_routes' ) );
 			add_action( 'admin_menu', array( $this->admin_pages, 'register_menus' ) );
 			add_action( 'admin_init', array( $this->admin_pages, 'register_admin_actions' ) );
+			add_action( 'admin_init', array( $this, 'maybe_redirect_after_activation' ) );
 			add_action( 'admin_enqueue_scripts', array( $this->admin_pages, 'enqueue_assets' ) );
 			add_action( 'admin_notices', array( $this->admin_pages, 'render_plugins_page_notices' ) );
 			add_filter( 'plugin_row_meta', array( $this->admin_pages, 'add_plugin_row_meta_check_update' ), 10, 4 );
@@ -115,5 +117,41 @@ class Plugin {
 		$logger->maybe_run_maintenance( 30, 10000, 3600 );
 
 		$this->initialized = true;
+	}
+
+	/**
+	 * Redirect admin to RawatWP General page after first-time activation.
+	 *
+	 * @return void
+	 */
+	public function maybe_redirect_after_activation() {
+		$should_redirect = get_option( Activator::OPTION_ACTIVATION_REDIRECT, '0' );
+		if ( '1' !== (string) $should_redirect ) {
+			return;
+		}
+
+		delete_option( Activator::OPTION_ACTIVATION_REDIRECT );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return;
+		}
+
+		if ( isset( $_GET['activate-multi'] ) ) {
+			return;
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page' => 'rawatwp-general',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 }

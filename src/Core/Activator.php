@@ -7,11 +7,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Activator {
 	/**
+	 * Option key: first install timestamp.
+	 */
+	const OPTION_INSTALLED_AT = 'rawatwp_installed_at';
+
+	/**
+	 * Option key: post-activation redirect marker.
+	 */
+	const OPTION_ACTIVATION_REDIRECT = 'rawatwp_activation_redirect';
+
+	/**
 	 * Plugin activation callback.
 	 *
+	 * @param bool $network_wide True if network activated.
 	 * @return void
 	 */
-	public static function activate() {
+	public static function activate( $network_wide = false ) {
 		$database = new Database();
 		$database->maybe_upgrade_schema();
 
@@ -23,7 +34,16 @@ class Activator {
 			add_option( 'rawatwp_delete_all_on_uninstall', '1' );
 		}
 
+		$is_first_install = false === get_option( self::OPTION_INSTALLED_AT, false );
+		if ( $is_first_install ) {
+			add_option( self::OPTION_INSTALLED_AT, gmdate( 'Y-m-d H:i:s' ) );
+		}
+
 		self::ensure_storage_directories();
+
+		if ( $is_first_install && is_admin() && ! ( is_multisite() && $network_wide ) ) {
+			update_option( self::OPTION_ACTIVATION_REDIRECT, '1', false );
+		}
 	}
 
 	/**
