@@ -558,12 +558,27 @@ class AdminPages {
 											<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
 										</div>
 									</div>
-									<?php if ( empty( $health ) ) : ?>
-										<p class="rawatwp-site-health-meta">Not checked yet.</p>
-									<?php else : ?>
+								<?php if ( empty( $health ) ) : ?>
+									<p class="rawatwp-site-health-meta">Not checked yet.</p>
+								<?php else : ?>
+									<?php if ( isset( $health['status'] ) && 'failed' === sanitize_key( (string) $health['status'] ) ) : ?>
 										<p class="rawatwp-site-health-meta">
 											<?php
 											echo esc_html(
+												sprintf(
+													'Last check failed on %s.',
+													$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
+												)
+											);
+											?>
+										</p>
+										<p class="rawatwp-site-health-meta">
+											<?php echo esc_html( ! empty( $health['error_message'] ) ? (string) $health['error_message'] : 'Unable to check updates on this child site.' ); ?>
+										</p>
+									<?php else : ?>
+									<p class="rawatwp-site-health-meta">
+										<?php
+										echo esc_html(
 												sprintf(
 													'Core: %s | Themes: %d | Plugins: %d | Last check: %s',
 													! empty( $health['core']['needs_update'] ) ? 'Needs update' : 'Up to date',
@@ -571,11 +586,11 @@ class AdminPages {
 													isset( $health['counts']['plugins'] ) ? (int) $health['counts']['plugins'] : 0,
 													$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
 												)
-											);
-											?>
-										</p>
-										<?php if ( ! empty( $health['counts']['total'] ) ) : ?>
-											<ul class="rawatwp-site-health-update-list">
+										);
+										?>
+									</p>
+									<?php if ( ! empty( $health['counts']['total'] ) ) : ?>
+										<ul class="rawatwp-site-health-update-list">
 												<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
 													<li><strong>Core:</strong> <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></li>
 												<?php endif; ?>
@@ -591,11 +606,12 @@ class AdminPages {
 														<li><strong>Plugin:</strong> <?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
 													<?php endforeach; ?>
 												<?php endif; ?>
-											</ul>
-										<?php else : ?>
-											<p class="rawatwp-site-health-meta">No pending updates found.</p>
-										<?php endif; ?>
+										</ul>
+									<?php else : ?>
+										<p class="rawatwp-site-health-meta">No pending updates found.</p>
 									<?php endif; ?>
+									<?php endif; ?>
+								<?php endif; ?>
 								</div>
 							<?php endforeach; ?>
 						</div>
@@ -2608,13 +2624,15 @@ class AdminPages {
 			$counts   = isset( $snapshot['counts'] ) && is_array( $snapshot['counts'] ) ? $snapshot['counts'] : array();
 
 			$results[ $site_id ] = array(
-				'checked_at' => isset( $snapshot['checked_at'] ) ? sanitize_text_field( (string) $snapshot['checked_at'] ) : '',
-				'core'       => array(
+				'checked_at'     => isset( $snapshot['checked_at'] ) ? sanitize_text_field( (string) $snapshot['checked_at'] ) : '',
+				'status'         => isset( $snapshot['status'] ) ? sanitize_key( (string) $snapshot['status'] ) : 'success',
+				'error_message'  => isset( $snapshot['error_message'] ) ? sanitize_text_field( (string) $snapshot['error_message'] ) : '',
+				'core'           => array(
 					'needs_update'    => ! empty( $core['needs_update'] ),
 					'current_version' => isset( $core['current_version'] ) ? sanitize_text_field( (string) $core['current_version'] ) : '',
 					'latest_version'  => isset( $core['latest_version'] ) ? sanitize_text_field( (string) $core['latest_version'] ) : '',
 				),
-				'themes'     => array_values(
+				'themes'         => array_values(
 					array_filter(
 						array_map(
 							function( $theme ) {
@@ -2635,7 +2653,7 @@ class AdminPages {
 						}
 					)
 				),
-				'plugins'    => array_values(
+				'plugins'        => array_values(
 					array_filter(
 						array_map(
 							function( $plugin ) {
@@ -2656,7 +2674,7 @@ class AdminPages {
 						}
 					)
 				),
-				'counts'     => array(
+				'counts'         => array(
 					'core'    => isset( $counts['core'] ) ? max( 0, min( 1, (int) $counts['core'] ) ) : ( ! empty( $core['needs_update'] ) ? 1 : 0 ),
 					'themes'  => isset( $counts['themes'] ) ? max( 0, (int) $counts['themes'] ) : count( $themes ),
 					'plugins' => isset( $counts['plugins'] ) ? max( 0, (int) $counts['plugins'] ) : count( $plugins ),

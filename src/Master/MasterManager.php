@@ -218,27 +218,16 @@ class MasterManager {
 		);
 
 		$endpoint = untrailingslashit( $site['site_url'] ) . '/wp-json/rawatwp/v1/child/check-updates';
-		$packet   = $this->security->build_signed_packet(
-			array(
-				'site_url'       => home_url(),
-				'force_refresh'  => true,
-				'request_source' => 'master_manual',
-			),
-			$site['security_key']
+		$request_data = array(
+			'site_url'       => home_url(),
+			'force_refresh'  => true,
+			'request_source' => 'master_manual',
 		);
 
-		$response = wp_remote_post(
-			$endpoint,
-			array(
-				'timeout' => 120,
-				'headers' => array(
-					'Content-Type' => 'application/json',
-				),
-				'body'    => wp_json_encode( $packet ),
-			)
-		);
+		$response = $this->post_child_update_check_with_retry( $site, $endpoint, $request_data );
 
 		if ( is_wp_error( $response ) ) {
+			$detail = sanitize_text_field( $response->get_error_message() );
 			$this->logger->log(
 				array(
 					'mode'     => 'master',
@@ -247,10 +236,11 @@ class MasterManager {
 					'status'   => 'failed',
 					'message'  => 'Update check failed: could not connect to child site.',
 					'context'  => array(
-						'detail' => sanitize_text_field( $response->get_error_message() ),
+						'detail' => $detail,
 					),
 				)
 			);
+			$this->persist_failed_site_update_snapshot( $site, $detail );
 
 			return new \WP_Error( 'rawatwp_check_failed', __( 'Could not connect to child site.', 'rawatwp' ) );
 		}
@@ -276,6 +266,7 @@ class MasterManager {
 					),
 				)
 			);
+			$this->persist_failed_site_update_snapshot( $site, '' !== $detail ? $detail : __( 'Child response is invalid.', 'rawatwp' ) );
 
 			return new \WP_Error( 'rawatwp_check_invalid_response', __( 'Child response is invalid.', 'rawatwp' ) );
 		}
@@ -882,6 +873,8 @@ class MasterManager {
 	 * @return array
 	 */
 	private function sanitize_site_update_snapshot( array $snapshot ) {
+		$status        = isset( $snapshot['status'] ) ? sanitize_key( (string) $snapshot['status'] ) : 'success';
+		$error_message = isset( $snapshot['error_message'] ) ? sanitize_text_field( (string) $snapshot['error_message'] ) : '';
 		$core = isset( $snapshot['core'] ) && is_array( $snapshot['core'] ) ? $snapshot['core'] : array();
 		$core = array(
 			'needs_update'    => ! empty( $core['needs_update'] ),
@@ -952,11 +945,147 @@ class MasterManager {
 		$checked_at = isset( $snapshot['checked_at'] ) ? sanitize_text_field( (string) $snapshot['checked_at'] ) : current_time( 'mysql' );
 
 		return array(
-			'checked_at' => $checked_at,
-			'core'       => $core,
-			'themes'     => $themes,
-			'plugins'    => $plugins,
-			'counts'     => $counts,
+			'checked_at'     => $checked_at,
+			'status'         => in_array( $status, array( 'success', 'failed' ), true ) ? $status : 'success',
+			'error_message'  => $error_message,
+			'core'           => $core,
+			'themes'         => $themes,
+			'plugins'        => $plugins,
+			'counts'         => $counts,
 		);
+	}
+
+	/**
+	 * Persist failed update-check snapshot so UI shows clear reason instead of "Not checked yet".
+	 *
+	 * @param array  $site   Site row.
+	 * @param string $reason Human-readable failure reason.
+	 * @return void
+	 */
+	private function persist_failed_site_update_snapshot( array $site, $reason ) {
+		$reason = sanitize_text_field( (string) $reason );
+		if ( '' === $reason ) {
+			$reason = __( 'Unable to contact child site for update check.', 'rawatwp' );
+		}
+
+		$snapshot = array(
+			'checked_at'    => current_time( 'mysql' ),
+			'status'        => 'failed',
+			'error_message' => $reason,
+			'core'          => array(
+				'needs_update'    => false,
+				'current_version' => '',
+				'latest_version'  => '',
+			),
+			'themes'        => array(),
+			'plugins'       => array(),
+			'counts'        => array(
+				'core'    => 0,
+				'themes'  => 0,
+				'plugins' => 0,
+				'total'   => 0,
+			),
+		);
+
+		$report = $this->merge_site_last_report(
+			$site,
+			array(
+				'wp_update_check' => $snapshot,
+			)
+		);
+
+		$this->database->update_site(
+			(int) $site['id'],
+			array(
+				'last_seen'   => current_time( 'mysql' ),
+				'last_report' => $report,
+			)
+		);
+	}
+
+	/**
+	 * Send child update-check request with transient retry policy.
+	 *
+	 * @param array  $site         Site row.
+	 * @param string $endpoint     Child endpoint.
+	 * @param array  $request_data Signed payload data.
+	 * @return array|\WP_Error
+	 */
+	private function post_child_update_check_with_retry( array $site, $endpoint, array $request_data ) {
+		$max_attempts = 3;
+		$last_error   = null;
+
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			$packet = $this->security->build_signed_packet( $request_data, $site['security_key'] );
+			$result = wp_remote_post(
+				$endpoint,
+				array(
+					'timeout'         => 40,
+					'connect_timeout' => 8,
+					'redirection'     => 3,
+					'headers'         => array(
+						'Content-Type'      => 'application/json',
+						'X-RawatWP-Request' => 'site-update-check',
+					),
+					'body'            => wp_json_encode( $packet ),
+				)
+			);
+
+			if ( is_wp_error( $result ) ) {
+				$last_error = $result;
+				if ( $attempt < $max_attempts && $this->is_transient_http_error( 0, $result->get_error_message() ) ) {
+					sleep( 1 );
+					continue;
+				}
+				return $result;
+			}
+
+			$http_code = (int) wp_remote_retrieve_response_code( $result );
+			if ( $attempt < $max_attempts && $this->is_transient_http_error( $http_code, '' ) ) {
+				sleep( 1 );
+				continue;
+			}
+
+			return $result;
+		}
+
+		return $last_error instanceof \WP_Error ? $last_error : new \WP_Error( 'rawatwp_check_failed', __( 'Could not connect to child site.', 'rawatwp' ) );
+	}
+
+	/**
+	 * Decide whether an HTTP/network failure is transient and worth retrying.
+	 *
+	 * @param int    $http_code HTTP status code.
+	 * @param string $error_message WP error message.
+	 * @return bool
+	 */
+	private function is_transient_http_error( $http_code, $error_message ) {
+		$http_code = (int) $http_code;
+		if ( in_array( $http_code, array( 0, 408, 425, 429, 500, 502, 503, 504, 522, 524 ), true ) ) {
+			return true;
+		}
+
+		$error_message = strtolower( sanitize_text_field( (string) $error_message ) );
+		if ( '' === $error_message ) {
+			return false;
+		}
+
+		$transient_markers = array(
+			'timed out',
+			'timeout',
+			'connection reset',
+			'temporary',
+			'could not resolve host',
+			'failed to connect',
+			'connection refused',
+		);
+
+		foreach ( $transient_markers as $marker ) {
+			if ( false !== strpos( $error_message, $marker ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
