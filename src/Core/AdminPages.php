@@ -171,6 +171,7 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_scan_installed_items', array( $this, 'handle_scan_installed_items' ) );
 		add_action( 'admin_post_rawatwp_add_site', array( $this, 'handle_add_site' ) );
 		add_action( 'admin_post_rawatwp_regen_key', array( $this, 'handle_regenerate_site_key' ) );
+		add_action( 'admin_post_rawatwp_queue_rawatwp_update_all_sites', array( $this, 'handle_queue_rawatwp_update_all_sites' ) );
 		add_action( 'admin_post_rawatwp_upload_package', array( $this, 'handle_upload_package' ) );
 		add_action( 'admin_post_rawatwp_scan_updates_folder', array( $this, 'handle_scan_updates_folder' ) );
 		add_action( 'admin_post_rawatwp_delete_package', array( $this, 'handle_delete_package' ) );
@@ -429,6 +430,17 @@ class AdminPages {
 					<p>This page is available only in Master mode.</p>
 				</div>
 			<?php else : ?>
+				<?php
+				$sites            = $this->master_manager->get_sites();
+				$connected_site_ids = array();
+				foreach ( $sites as $site_row ) {
+					if ( isset( $site_row['connection_status'] ) && 'connected' === sanitize_key( (string) $site_row['connection_status'] ) ) {
+						$connected_site_ids[] = (int) $site_row['id'];
+					}
+				}
+				$connected_count         = count( $connected_site_ids );
+				$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
+				?>
 				<div class="rawatwp-card">
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_add_site' ); ?>
@@ -448,13 +460,22 @@ class AdminPages {
 				</div>
 
 				<div class="rawatwp-card">
-					<h2>Child Site List</h2>
+					<div class="rawatwp-card-header">
+						<h2>Child Site List</h2>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
+							<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
+							<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
+							<?php submit_button( 'Update RawatWP on All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+						</form>
+					</div>
+					<p class="description">Master RawatWP Version: <strong><?php echo esc_html( RAWATWP_VERSION ); ?></strong> | Connected sites: <strong><?php echo esc_html( (string) $connected_count ); ?></strong></p>
 					<table class="widefat striped rawatwp-sites-table">
 						<thead>
 							<tr>
 								<th class="rawatwp-col-id">ID</th>
 								<th class="rawatwp-col-site">Site Name</th>
 								<th class="rawatwp-col-domain">Domain</th>
+								<th class="rawatwp-col-rwp-version">RawatWP Version</th>
 								<th class="rawatwp-col-key">Security Key</th>
 								<th class="rawatwp-col-status">Status</th>
 								<th class="rawatwp-col-last-seen">Last Seen</th>
@@ -462,11 +483,12 @@ class AdminPages {
 							</tr>
 						</thead>
 						<tbody>
-							<?php foreach ( $this->master_manager->get_sites() as $site ) : ?>
+							<?php foreach ( $sites as $site ) : ?>
 								<tr>
 									<td class="rawatwp-col-id"><?php echo esc_html( (string) $site['id'] ); ?></td>
 									<td class="rawatwp-col-site"><?php echo esc_html( $site['site_name'] ); ?></td>
 									<td class="rawatwp-domain rawatwp-col-domain"><?php echo esc_html( $site['site_url'] ); ?></td>
+									<td class="rawatwp-col-rwp-version"><?php echo esc_html( ! empty( $site['rawatwp_version'] ) ? (string) $site['rawatwp_version'] : '-' ); ?></td>
 									<td class="rawatwp-col-key">
 										<div class="rawatwp-key-wrap">
 											<button
@@ -1652,6 +1674,52 @@ class AdminPages {
 		}
 
 		$this->redirect_with_notice( 'rawatwp-sites', 'Child security key regenerated successfully.', '' );
+	}
+
+	/**
+	 * Queue RawatWP plugin update to all connected child sites.
+	 *
+	 * @return void
+	 */
+	public function handle_queue_rawatwp_update_all_sites() {
+		$this->assert_admin_post( 'rawatwp_queue_rawatwp_update_all_sites' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'This feature is available only in Master mode.' );
+		}
+
+		$sites    = $this->master_manager->get_sites();
+		$site_ids = array();
+		foreach ( $sites as $site ) {
+			if ( isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] ) ) {
+				$site_ids[] = (int) $site['id'];
+			}
+		}
+
+		if ( empty( $site_ids ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'No connected child sites found.' );
+		}
+
+		$package = $this->package_manager->ensure_rawatwp_self_package();
+		if ( is_wp_error( $package ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', $package->get_error_message() );
+		}
+
+		if ( ! is_array( $package ) || empty( $package['id'] ) || 'plugin' !== (string) $package['type'] || 'rawatwp' !== sanitize_key( (string) $package['target_slug'] ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', 'Failed to prepare valid RawatWP package.' );
+		}
+
+		$result = $this->queue_manager->enqueue_batch( (int) $package['id'], $site_ids );
+		if ( is_wp_error( $result ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', $result->get_error_message() );
+		}
+
+		$message = sprintf(
+			'RawatWP update queued for %d connected site(s). Batch: %s.',
+			count( $site_ids ),
+			isset( $result['batch_id'] ) ? (string) $result['batch_id'] : '-'
+		);
+		$this->redirect_with_notice( 'rawatwp-sites', $message, '' );
 	}
 
 	/**

@@ -9,7 +9,7 @@ class Database {
 	/**
 	 * Schema version for db migrations.
 	 */
-	const SCHEMA_VERSION = '1.4.0';
+	const SCHEMA_VERSION = '1.5.0';
 
 	/**
 	 * Option key for schema version.
@@ -51,6 +51,7 @@ class Database {
 			security_key VARCHAR(191) NOT NULL,
 			connection_status VARCHAR(50) NOT NULL DEFAULT 'disconnected',
 			last_seen DATETIME NULL,
+			rawatwp_version VARCHAR(50) NULL,
 			last_report LONGTEXT NULL,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
@@ -203,11 +204,12 @@ class Database {
 				'security_key'       => sanitize_text_field( $data['security_key'] ),
 				'connection_status'  => sanitize_text_field( $data['connection_status'] ),
 				'last_seen'          => isset( $data['last_seen'] ) ? $data['last_seen'] : null,
+				'rawatwp_version'    => isset( $data['rawatwp_version'] ) ? sanitize_text_field( $data['rawatwp_version'] ) : null,
 				'last_report'        => isset( $data['last_report'] ) ? wp_json_encode( $data['last_report'] ) : null,
 				'created_at'         => $now,
 				'updated_at'         => $now,
 			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $inserted ) {
@@ -254,6 +256,10 @@ class Database {
 		if ( array_key_exists( 'last_seen', $data ) ) {
 			$fields['last_seen'] = $data['last_seen'];
 			$format[]            = '%s';
+		}
+		if ( array_key_exists( 'rawatwp_version', $data ) ) {
+			$fields['rawatwp_version'] = null === $data['rawatwp_version'] ? null : sanitize_text_field( (string) $data['rawatwp_version'] );
+			$format[]                  = '%s';
 		}
 		if ( array_key_exists( 'last_report', $data ) ) {
 			$fields['last_report'] = null === $data['last_report'] ? null : wp_json_encode( $data['last_report'] );
@@ -965,6 +971,7 @@ class Database {
 	 */
 	private function hydrate_site_row( array $row ) {
 		$row['last_report'] = ! empty( $row['last_report'] ) ? json_decode( $row['last_report'], true ) : array();
+		$row['rawatwp_version'] = isset( $row['rawatwp_version'] ) ? sanitize_text_field( (string) $row['rawatwp_version'] ) : '';
 
 		return $row;
 	}

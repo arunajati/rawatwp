@@ -380,6 +380,106 @@ class PackageManager {
 	}
 
 	/**
+	 * Ensure current Master RawatWP plugin is available as package.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public function ensure_rawatwp_self_package() {
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			return new \WP_Error( 'rawatwp_zip_missing', __( 'ZipArchive is not available on this server.', 'rawatwp' ) );
+		}
+
+		$plugin_root = wp_normalize_path( untrailingslashit( (string) RAWATWP_DIR ) );
+		if ( '' === $plugin_root || ! is_dir( $plugin_root ) ) {
+			return new \WP_Error( 'rawatwp_self_package_root_missing', __( 'RawatWP plugin folder is not available for packaging.', 'rawatwp' ) );
+		}
+
+		$temp_zip = wp_tempnam( 'rawatwp-self-package.zip' );
+		if ( ! is_string( $temp_zip ) || '' === $temp_zip ) {
+			return new \WP_Error( 'rawatwp_self_package_temp_failed', __( 'Failed to create temporary zip for RawatWP package.', 'rawatwp' ) );
+		}
+		$temp_zip = wp_normalize_path( $temp_zip );
+
+		$zip = new \ZipArchive();
+		if ( true !== $zip->open( $temp_zip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE ) ) {
+			@unlink( $temp_zip );
+			return new \WP_Error( 'rawatwp_self_package_zip_failed', __( 'Failed to create RawatWP package zip.', 'rawatwp' ) );
+		}
+
+		try {
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $plugin_root, \FilesystemIterator::SKIP_DOTS ),
+				\RecursiveIteratorIterator::SELF_FIRST
+			);
+
+			foreach ( $iterator as $entry ) {
+				if ( ! $entry instanceof \SplFileInfo ) {
+					continue;
+				}
+
+				$absolute_path = wp_normalize_path( $entry->getPathname() );
+				$relative_path = ltrim( str_replace( $plugin_root, '', $absolute_path ), '/' );
+				if ( '' === $relative_path ) {
+					continue;
+				}
+
+				if ( $this->should_skip_rawatwp_self_package_path( $relative_path ) ) {
+					continue;
+				}
+
+				$zip_path = 'rawatwp/' . $relative_path;
+				if ( $entry->isDir() ) {
+					$zip->addEmptyDir( $zip_path );
+				} elseif ( $entry->isFile() ) {
+					$zip->addFile( $absolute_path, $zip_path );
+				}
+			}
+		} finally {
+			$zip->close();
+		}
+
+		$file_hash = hash_file( 'sha256', $temp_zip );
+		if ( ! is_string( $file_hash ) || '' === $file_hash ) {
+			@unlink( $temp_zip );
+			return new \WP_Error( 'rawatwp_self_package_hash_failed', __( 'Failed to hash RawatWP package zip.', 'rawatwp' ) );
+		}
+
+		$existing = $this->database->get_package_by_hash( $file_hash );
+		if ( is_array( $existing ) ) {
+			@unlink( $temp_zip );
+			return $existing;
+		}
+
+		$file = array(
+			'name'     => 'rawatwp-' . ( defined( 'RAWATWP_VERSION' ) ? sanitize_text_field( (string) RAWATWP_VERSION ) : gmdate( 'YmdHis' ) ) . '.zip',
+			'type'     => 'application/zip',
+			'tmp_name' => $temp_zip,
+			'error'    => 0,
+			'size'     => (int) @filesize( $temp_zip ),
+		);
+
+		$uploaded = $this->upload_package( $file );
+		@unlink( $temp_zip );
+
+		if ( is_wp_error( $uploaded ) ) {
+			if ( 'rawatwp_package_duplicate' === $uploaded->get_error_code() ) {
+				$duplicate = $this->database->get_package_by_hash( $file_hash );
+				if ( is_array( $duplicate ) ) {
+					return $duplicate;
+				}
+			}
+
+			return $uploaded;
+		}
+
+		if ( ! is_array( $uploaded ) || ! isset( $uploaded['type'], $uploaded['target_slug'] ) || 'plugin' !== (string) $uploaded['type'] || 'rawatwp' !== sanitize_key( (string) $uploaded['target_slug'] ) ) {
+			return new \WP_Error( 'rawatwp_self_package_invalid', __( 'Generated RawatWP package is invalid.', 'rawatwp' ) );
+		}
+
+		return $uploaded;
+	}
+
+	/**
 	 * Delete one package (file + DB metadata).
 	 *
 	 * @param int $package_id Package ID.
@@ -525,6 +625,38 @@ class PackageManager {
 		$path = wp_normalize_path( (string) $path );
 
 		return 0 === strpos( $path, $base );
+	}
+
+	/**
+	 * Skip non-runtime files when creating self package.
+	 *
+	 * @param string $relative_path Relative path from plugin root.
+	 * @return bool
+	 */
+	private function should_skip_rawatwp_self_package_path( $relative_path ) {
+		$relative_path = ltrim( wp_normalize_path( (string) $relative_path ), '/' );
+		if ( '' === $relative_path ) {
+			return true;
+		}
+
+		$segments = explode( '/', $relative_path );
+		$first    = isset( $segments[0] ) ? (string) $segments[0] : '';
+
+		if ( in_array( $first, array( '.git', '.github', '.vscode', 'node_modules' ), true ) ) {
+			return true;
+		}
+
+		if ( preg_match( '/^rawatwp-[0-9][A-Za-z0-9.\-]*\.zip$/i', $first ) ) {
+			return true;
+		}
+
+		foreach ( $segments as $segment ) {
+			if ( '.DS_Store' === $segment ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

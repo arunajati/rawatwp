@@ -335,6 +335,16 @@ class MasterManager {
 			)
 		);
 
+		if ( in_array( $status, array( 'update_success', 'success' ), true ) && 'plugin' === (string) $package['type'] && 'rawatwp' === sanitize_key( (string) $package['target_slug'] ) ) {
+			$this->database->update_site(
+				(int) $site['id'],
+				array(
+					'rawatwp_version' => defined( 'RAWATWP_VERSION' ) ? (string) RAWATWP_VERSION : '',
+					'last_seen'       => current_time( 'mysql' ),
+				)
+			);
+		}
+
 		return array(
 			'status'       => $status,
 			'message'      => $message,
@@ -424,14 +434,17 @@ class MasterManager {
 			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => $verification->get_error_message() ), 403 );
 		}
 
-		$this->database->update_site(
-			$site['id'],
-			array(
-				'site_name'          => isset( $packet['data']['site_name'] ) ? sanitize_text_field( $packet['data']['site_name'] ) : $site['site_name'],
-				'connection_status'  => 'connected',
-				'last_seen'          => current_time( 'mysql' ),
-			)
+		$update_fields = array(
+			'site_name'         => isset( $packet['data']['site_name'] ) ? sanitize_text_field( $packet['data']['site_name'] ) : $site['site_name'],
+			'connection_status' => 'connected',
+			'last_seen'         => current_time( 'mysql' ),
 		);
+		$rawatwp_version = $this->extract_packet_rawatwp_version( $packet );
+		if ( '' !== $rawatwp_version ) {
+			$update_fields['rawatwp_version'] = $rawatwp_version;
+		}
+
+		$this->database->update_site( $site['id'], $update_fields );
 
 		$this->logger->log(
 			array(
@@ -498,17 +511,20 @@ class MasterManager {
 			}
 		}
 
-		$this->database->update_site(
-			$site['id'],
-			array(
-				'connection_status' => 'connected',
-				'last_seen'         => current_time( 'mysql' ),
-				'last_report'       => array(
-					'reported_at' => current_time( 'mysql' ),
-					'items'       => $items,
-				),
-			)
+		$update_fields = array(
+			'connection_status' => 'connected',
+			'last_seen'         => current_time( 'mysql' ),
+			'last_report'       => array(
+				'reported_at' => current_time( 'mysql' ),
+				'items'       => $items,
+			),
 		);
+		$rawatwp_version = $this->extract_packet_rawatwp_version( $packet );
+		if ( '' !== $rawatwp_version ) {
+			$update_fields['rawatwp_version'] = $rawatwp_version;
+		}
+
+		$this->database->update_site( $site['id'], $update_fields );
 
 		$this->logger->log(
 			array(
@@ -578,13 +594,16 @@ class MasterManager {
 			);
 		}
 
-		$this->database->update_site(
-			$site['id'],
-			array(
-				'connection_status' => 'connected',
-				'last_seen'         => current_time( 'mysql' ),
-			)
+		$update_fields = array(
+			'connection_status' => 'connected',
+			'last_seen'         => current_time( 'mysql' ),
 		);
+		$rawatwp_version = $this->extract_packet_rawatwp_version( $packet );
+		if ( '' !== $rawatwp_version ) {
+			$update_fields['rawatwp_version'] = $rawatwp_version;
+		}
+
+		$this->database->update_site( $site['id'], $update_fields );
 
 		return new \WP_REST_Response(
 			array(
@@ -646,5 +665,21 @@ class MasterManager {
 		header( 'Content-Length: ' . filesize( $file_path ) );
 		readfile( $file_path );
 		exit;
+	}
+
+	/**
+	 * Extract child RawatWP version from signed packet.
+	 *
+	 * @param array $packet Signed packet payload.
+	 * @return string
+	 */
+	private function extract_packet_rawatwp_version( array $packet ) {
+		$version = '';
+		if ( isset( $packet['data']['rawatwp_version'] ) ) {
+			$version = (string) $packet['data']['rawatwp_version'];
+		}
+
+		$version = preg_replace( '/[^0-9A-Za-z.\-+]/', '', $version );
+		return sanitize_text_field( (string) $version );
 	}
 }

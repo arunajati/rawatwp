@@ -138,7 +138,12 @@
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-domain {
-	width: 38%;
+	width: 30%;
+}
+
+.rawatwp-admin .rawatwp-sites-table .rawatwp-col-rwp-version {
+	width: 115px;
+	white-space: nowrap;
 }
 
 .rawatwp-admin .rawatwp-sites-table .rawatwp-col-key {

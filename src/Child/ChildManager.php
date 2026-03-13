@@ -133,8 +133,9 @@ class ChildManager {
 		$endpoint = untrailingslashit( $settings['master_url'] ) . '/wp-json/rawatwp/v1/master/register';
 		$packet   = $this->security->build_signed_packet(
 			array(
-				'site_name' => get_bloginfo( 'name' ),
-				'site_url'  => home_url(),
+				'site_name'       => get_bloginfo( 'name' ),
+				'site_url'        => home_url(),
+				'rawatwp_version' => $this->get_local_rawatwp_version(),
 			),
 			$settings['security_key']
 		);
@@ -222,9 +223,10 @@ class ChildManager {
 
 		$packet = $this->security->build_signed_packet(
 			array(
-				'site_name' => get_bloginfo( 'name' ),
-				'site_url'  => home_url(),
-				'items'     => $items,
+				'site_name'       => get_bloginfo( 'name' ),
+				'site_url'        => home_url(),
+				'rawatwp_version' => $this->get_local_rawatwp_version(),
+				'items'           => $items,
 			),
 			$settings['security_key']
 		);
@@ -279,8 +281,9 @@ class ChildManager {
 
 		$packet = $this->security->build_signed_packet(
 			array(
-				'site_url' => home_url(),
-				'events'   => $events,
+				'site_url'        => home_url(),
+				'rawatwp_version' => $this->get_local_rawatwp_version(),
+				'events'          => $events,
 			),
 			$settings['security_key']
 		);
@@ -439,5 +442,17 @@ class ChildManager {
 			),
 			'update_success' === $result['status'] ? 200 : 500
 		);
+	}
+
+	/**
+	 * Get local RawatWP version.
+	 *
+	 * @return string
+	 */
+	private function get_local_rawatwp_version() {
+		$version = defined( 'RAWATWP_VERSION' ) ? (string) RAWATWP_VERSION : '';
+		$version = preg_replace( '/[^0-9A-Za-z.\-+]/', '', $version );
+
+		return sanitize_text_field( (string) $version );
 	}
 }
