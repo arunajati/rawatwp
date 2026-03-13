@@ -485,7 +485,7 @@ class AdminPages {
 								<th class="rawatwp-col-id">ID</th>
 								<th class="rawatwp-col-site">Site Name</th>
 								<th class="rawatwp-col-domain">Domain</th>
-								<th class="rawatwp-col-rwp-version">RawatWP Version</th>
+								<th class="rawatwp-col-rwp-version">RWP Ver.</th>
 								<th class="rawatwp-col-key rawatwp-no-sort">Security Key</th>
 								<th class="rawatwp-col-status">Status</th>
 								<th class="rawatwp-col-last-seen">Last Seen</th>
