@@ -1629,13 +1629,7 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-packages', '', $result->get_error_message() );
 		}
 
-		$message = sprintf(
-			'Folder scan complete. Total zip: %d, Imported: %d, Skipped: %d, Failed: %d.',
-			(int) $result['total'],
-			(int) $result['imported'],
-			(int) $result['skipped'],
-			(int) $result['failed']
-		);
+		$message = $this->format_scan_result_notice( $result );
 
 		$this->redirect_with_notice( 'rawatwp-packages', $message, '' );
 	}
@@ -1962,6 +1956,43 @@ class AdminPages {
 		}
 
 		return ucfirst( $type );
+	}
+
+	/**
+	 * Build a human-friendly notice for package scan result.
+	 *
+	 * @param array $result Scan result payload.
+	 * @return string
+	 */
+	private function format_scan_result_notice( array $result ) {
+		$total    = isset( $result['total'] ) ? (int) $result['total'] : 0;
+		$imported = isset( $result['imported'] ) ? (int) $result['imported'] : 0;
+		$skipped  = isset( $result['skipped'] ) ? (int) $result['skipped'] : 0;
+		$failed   = isset( $result['failed'] ) ? (int) $result['failed'] : 0;
+
+		if ( $total <= 0 ) {
+			return 'Scan complete. No zip files were found.';
+		}
+
+		if ( $imported > 0 && 0 === $failed && 0 === $skipped ) {
+			return sprintf( 'Scan complete. Added %d new package(s).', $imported );
+		}
+
+		if ( 0 === $imported && 0 === $failed && $skipped === $total ) {
+			return sprintf( 'Scan complete. %d zip file(s) found, all already in your package list.', $total );
+		}
+
+		if ( 0 === $imported && $failed > 0 ) {
+			return sprintf( 'Scan complete. %d zip file(s) found, but none could be added. Failed: %d.', $total, $failed );
+		}
+
+		return sprintf(
+			'Scan complete. %d zip file(s) found: %d added, %d already listed, %d failed.',
+			$total,
+			$imported,
+			$skipped,
+			$failed
+		);
 	}
 
 	/**
