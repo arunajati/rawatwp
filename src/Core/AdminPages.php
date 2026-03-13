@@ -475,18 +475,11 @@ class AdminPages {
 				<div class="rawatwp-card">
 					<div class="rawatwp-card-header">
 						<h2>Child Site List</h2>
-						<div class="rawatwp-toolbar">
-							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
-								<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
-								<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
-								<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
-							</form>
-							<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
-								<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
-								<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
-								<?php submit_button( 'Check Updates on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
-							</form>
-						</div>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
+							<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
+							<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
+							<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+						</form>
 					</div>
 					<p class="description">Master RawatWP Version: <strong><?php echo esc_html( $master_version ); ?></strong> | Connected sites: <strong><?php echo esc_html( (string) $connected_count ); ?></strong></p>
 					<table class="widefat striped rawatwp-sites-table">
@@ -523,14 +516,6 @@ class AdminPages {
 									<td class="rawatwp-col-status"><?php echo esc_html( $site['connection_status'] ); ?></td>
 									<td class="rawatwp-col-last-seen"><?php echo esc_html( $this->format_datetime_for_display( isset( $site['last_seen'] ) ? $site['last_seen'] : '' ) ); ?></td>
 									<td class="rawatwp-col-action">
-										<?php if ( 'connected' === sanitize_key( (string) $site['connection_status'] ) ) : ?>
-											<form class="rawatwp-action-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-												<?php wp_nonce_field( 'rawatwp_check_site_updates' ); ?>
-												<input type="hidden" name="action" value="rawatwp_check_site_updates" />
-												<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site['id'] ); ?>" />
-												<button class="button button-secondary" type="submit">Check Updates</button>
-											</form>
-										<?php endif; ?>
 										<form class="rawatwp-action-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 											<?php wp_nonce_field( 'rawatwp_regen_key' ); ?>
 											<input type="hidden" name="action" value="rawatwp_regen_key" />
@@ -572,12 +557,6 @@ class AdminPages {
 										<div>
 											<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
 										</div>
-										<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-											<?php wp_nonce_field( 'rawatwp_check_site_updates' ); ?>
-											<input type="hidden" name="action" value="rawatwp_check_site_updates" />
-											<input type="hidden" name="site_id" value="<?php echo esc_attr( (string) $site_id ); ?>" />
-											<button class="button button-secondary" type="submit">Check Now</button>
-										</form>
 									</div>
 									<?php if ( empty( $health ) ) : ?>
 										<p class="rawatwp-site-health-meta">Not checked yet.</p>
@@ -596,30 +575,25 @@ class AdminPages {
 											?>
 										</p>
 										<?php if ( ! empty( $health['counts']['total'] ) ) : ?>
-											<details class="rawatwp-site-health-details">
-												<summary>View update details</summary>
+											<ul class="rawatwp-site-health-update-list">
 												<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
-													<p>WordPress Core: <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></p>
+													<li><strong>Core:</strong> <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></li>
 												<?php endif; ?>
 
 												<?php if ( ! empty( $health['themes'] ) && is_array( $health['themes'] ) ) : ?>
-													<p><strong>Themes</strong></p>
-													<ul>
-														<?php foreach ( $health['themes'] as $theme_item ) : ?>
-															<li><?php echo esc_html( (string) $theme_item['name'] . ' (' . (string) $theme_item['current_version'] . ' -> ' . (string) $theme_item['new_version'] . ')' ); ?></li>
-														<?php endforeach; ?>
-													</ul>
+													<?php foreach ( $health['themes'] as $theme_item ) : ?>
+														<li><strong>Theme:</strong> <?php echo esc_html( (string) $theme_item['name'] . ' (' . (string) $theme_item['current_version'] . ' -> ' . (string) $theme_item['new_version'] . ')' ); ?></li>
+													<?php endforeach; ?>
 												<?php endif; ?>
 
 												<?php if ( ! empty( $health['plugins'] ) && is_array( $health['plugins'] ) ) : ?>
-													<p><strong>Plugins</strong></p>
-													<ul>
-														<?php foreach ( $health['plugins'] as $plugin_item ) : ?>
-															<li><?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
-														<?php endforeach; ?>
-													</ul>
+													<?php foreach ( $health['plugins'] as $plugin_item ) : ?>
+														<li><strong>Plugin:</strong> <?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
+													<?php endforeach; ?>
 												<?php endif; ?>
-											</details>
+											</ul>
+										<?php else : ?>
+											<p class="rawatwp-site-health-meta">No pending updates found.</p>
 										<?php endif; ?>
 									<?php endif; ?>
 								</div>
