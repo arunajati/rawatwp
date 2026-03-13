@@ -19,6 +19,10 @@ class Activator {
 			add_option( ModeManager::OPTION_MODE, '' );
 		}
 
+		if ( false === get_option( 'rawatwp_delete_all_on_uninstall', false ) ) {
+			add_option( 'rawatwp_delete_all_on_uninstall', '1' );
+		}
+
 		self::ensure_storage_directories();
 	}
 

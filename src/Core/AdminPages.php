@@ -231,7 +231,7 @@ class AdminPages {
 	public function render_general_page() {
 		$this->assert_admin();
 		$mode = $this->mode_manager->get_mode();
-		$delete_all_on_uninstall = '1' === (string) get_option( 'rawatwp_delete_all_on_uninstall', '0' );
+		$delete_all_on_uninstall = '1' === (string) get_option( 'rawatwp_delete_all_on_uninstall', '1' );
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - General</h1>
@@ -1472,7 +1472,8 @@ class AdminPages {
 			)
 		);
 
-		$this->redirect_with_notice( 'rawatwp-general', 'Settings saved successfully.', '' );
+		$redirect_page = 'child' === $mode ? 'rawatwp-connection' : 'rawatwp-general';
+		$this->redirect_with_notice( $redirect_page, 'Settings saved successfully.', '' );
 	}
 
 	/**
