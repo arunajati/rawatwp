@@ -414,19 +414,77 @@ class GitHubUpdater {
 
 		$owner = rawurlencode( (string) $this->settings['owner'] );
 		$repo  = rawurlencode( (string) $this->settings['repo'] );
-		$url   = sprintf( 'https://api.github.com/repos/%s/%s/releases/latest', $owner, $repo );
 
 		$args = array(
 			'timeout' => 20,
 			'headers' => array(
-				'Accept'     => 'application/vnd.github+json',
-				'User-Agent' => 'RawatWP/' . RAWATWP_VERSION,
+				'Accept'               => 'application/vnd.github+json',
+				'User-Agent'           => 'RawatWP/' . RAWATWP_VERSION,
+				'X-GitHub-Api-Version' => '2022-11-28',
+				'Cache-Control'        => 'no-cache',
 			),
 		);
 
 		if ( '' !== (string) $this->settings['token'] ) {
 			$args['headers']['Authorization'] = 'Bearer ' . (string) $this->settings['token'];
 		}
+
+		$latest_url = sprintf(
+			'https://api.github.com/repos/%s/%s/releases/latest?rawatwp_cache=%d',
+			$owner,
+			$repo,
+			time()
+		);
+		$release    = $this->fetch_single_release_from_url( $latest_url, $args );
+		if ( is_wp_error( $release ) ) {
+			$release = $this->fetch_best_release_from_list( $owner, $repo, $args );
+			if ( is_wp_error( $release ) ) {
+				return $release;
+			}
+		}
+
+		set_transient( $cache_key, $release, DAY_IN_SECONDS );
+
+		return $release;
+	}
+
+	/**
+	 * Fetch one release payload and parse it.
+	 *
+	 * @param string $url API URL.
+	 * @param array  $args HTTP args.
+	 * @return array|\WP_Error
+	 */
+	private function fetch_single_release_from_url( $url, array $args ) {
+		$response = wp_remote_get( $url, $args );
+		if ( is_wp_error( $response ) ) {
+			return new \WP_Error( 'rawatwp_gh_request_failed', 'Failed to connect to update server: ' . $response->get_error_message() );
+		}
+
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		$body = json_decode( (string) wp_remote_retrieve_body( $response ), true );
+		if ( $code < 200 || $code >= 300 || ! is_array( $body ) ) {
+			return new \WP_Error( 'rawatwp_gh_bad_response', 'Release data cannot be read. Check connection or source access.' );
+		}
+
+		return $this->parse_release_payload( $body );
+	}
+
+	/**
+	 * Fetch release list and pick the best stable release with installable asset.
+	 *
+	 * @param string $owner Encoded owner.
+	 * @param string $repo Encoded repo.
+	 * @param array  $args HTTP args.
+	 * @return array|\WP_Error
+	 */
+	private function fetch_best_release_from_list( $owner, $repo, array $args ) {
+		$url = sprintf(
+			'https://api.github.com/repos/%s/%s/releases?per_page=20&rawatwp_cache=%d',
+			$owner,
+			$repo,
+			time()
+		);
 
 		$response = wp_remote_get( $url, $args );
 		if ( is_wp_error( $response ) ) {
@@ -439,18 +497,57 @@ class GitHubUpdater {
 			return new \WP_Error( 'rawatwp_gh_bad_response', 'Release data cannot be read. Check connection or source access.' );
 		}
 
+		$best_release = null;
+
+		foreach ( $body as $release_item ) {
+			if ( ! is_array( $release_item ) ) {
+				continue;
+			}
+
+			if ( ! empty( $release_item['draft'] ) || ! empty( $release_item['prerelease'] ) ) {
+				continue;
+			}
+
+			$parsed = $this->parse_release_payload( $release_item );
+			if ( is_wp_error( $parsed ) ) {
+				continue;
+			}
+
+			if ( null === $best_release || version_compare( $parsed['version'], $best_release['version'], '>' ) ) {
+				$best_release = $parsed;
+			}
+		}
+
+		if ( is_array( $best_release ) ) {
+			return $best_release;
+		}
+
+		return new \WP_Error( 'rawatwp_gh_no_asset', 'Release must include an installable zip asset, for example rawatwp-0.1.19.zip.' );
+	}
+
+	/**
+	 * Parse release payload into updater structure.
+	 *
+	 * @param array $body GitHub release payload.
+	 * @return array|\WP_Error
+	 */
+	private function parse_release_payload( array $body ) {
 		$tag = isset( $body['tag_name'] ) ? sanitize_text_field( (string) $body['tag_name'] ) : '';
 		if ( '' === $tag ) {
 			return new \WP_Error( 'rawatwp_gh_no_tag', 'Release has no version tag.' );
 		}
 
-		$version     = ltrim( $tag, "vV \t\n\r\0\x0B" );
+		$version = ltrim( $tag, "vV \t\n\r\0\x0B" );
+		if ( '' === $version ) {
+			return new \WP_Error( 'rawatwp_gh_no_tag', 'Release has no version tag.' );
+		}
+
 		$package_url = $this->pick_release_asset_url( $body );
 		if ( '' === $package_url ) {
 			return new \WP_Error( 'rawatwp_gh_no_asset', 'Release must include an installable zip asset, for example rawatwp-0.1.19.zip.' );
 		}
 
-		$release = array(
+		return array(
 			'version'     => $version,
 			'tag'         => $tag,
 			'package_url' => $package_url,
@@ -458,10 +555,6 @@ class GitHubUpdater {
 			'published'   => isset( $body['published_at'] ) ? sanitize_text_field( (string) $body['published_at'] ) : '',
 			'body'        => isset( $body['body'] ) ? (string) $body['body'] : '',
 		);
-
-		set_transient( $cache_key, $release, DAY_IN_SECONDS );
-
-		return $release;
 	}
 
 	/**
