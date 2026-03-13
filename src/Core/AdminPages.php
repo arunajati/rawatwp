@@ -563,6 +563,13 @@ class AdminPages {
 							<label for="rawatwp-package-zip-input"><strong>Choose zip file</strong></label>
 							<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 							<p id="rawatwp-upload-file-count" class="description"></p>
+							<div id="rawatwp-selected-files" class="rawatwp-selected-files" hidden>
+								<div class="rawatwp-selected-files-head">
+									<strong>Selected Files</strong>
+									<button id="rawatwp-clear-selected-files" type="button" class="button-link">Clear all</button>
+								</div>
+								<ul id="rawatwp-selected-files-list" class="rawatwp-selected-files-list"></ul>
+							</div>
 						</div>
 						<?php submit_button( 'Upload zip', 'primary', 'submit', false, array( 'id' => 'rawatwp-upload-submit' ) ); ?>
 					</form>
@@ -570,7 +577,10 @@ class AdminPages {
 					<div id="rawatwp-upload-monitor" class="rawatwp-upload-monitor" hidden>
 						<div class="rawatwp-upload-monitor-header">
 							<strong>Upload Monitor</strong>
-							<button id="rawatwp-upload-monitor-close" type="button" class="button-link">Close</button>
+							<div class="rawatwp-upload-monitor-actions">
+								<button id="rawatwp-upload-monitor-cancel" type="button" class="button button-secondary button-small">Cancel upload</button>
+								<button id="rawatwp-upload-monitor-close" type="button" class="button-link">Close</button>
+							</div>
 						</div>
 						<p id="rawatwp-upload-summary" class="rawatwp-upload-summary">Waiting for upload...</p>
 						<div id="rawatwp-upload-items" class="rawatwp-upload-items"></div>
@@ -658,18 +668,98 @@ class AdminPages {
 					var fileInput = document.getElementById('rawatwp-package-zip-input');
 					var submitButton = document.getElementById('rawatwp-upload-submit');
 					var fileCountInfo = document.getElementById('rawatwp-upload-file-count');
+					var selectedFilesWrap = document.getElementById('rawatwp-selected-files');
+					var selectedFilesList = document.getElementById('rawatwp-selected-files-list');
+					var clearSelectedFilesBtn = document.getElementById('rawatwp-clear-selected-files');
 					var uploadMonitor = document.getElementById('rawatwp-upload-monitor');
 					var uploadSummary = document.getElementById('rawatwp-upload-summary');
 					var uploadItems = document.getElementById('rawatwp-upload-items');
 					var closeMonitorBtn = document.getElementById('rawatwp-upload-monitor-close');
+					var cancelMonitorBtn = document.getElementById('rawatwp-upload-monitor-cancel');
 					var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 					var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'rawatwp_upload_package_item' ) ); ?>;
 					var uploadedRows = [];
+					var selectedFiles = [];
+					var activeXhr = null;
+					var cancelRequested = false;
 
 					function setSummary(text) {
 						if (uploadSummary) {
 							uploadSummary.textContent = text;
 						}
+					}
+
+					function supportsDataTransfer() {
+						return typeof window.DataTransfer !== 'undefined';
+					}
+
+					function syncInputFilesFromSelected() {
+						if (!fileInput) {
+							return;
+						}
+						if (!supportsDataTransfer()) {
+							if (!selectedFiles.length) {
+								fileInput.value = '';
+							}
+							return;
+						}
+
+						var transfer = new DataTransfer();
+						selectedFiles.forEach(function(file) {
+							transfer.items.add(file);
+						});
+						fileInput.files = transfer.files;
+					}
+
+					function updateUploadButtonsState() {
+						if (!uploadForm || !submitButton) {
+							return;
+						}
+
+						var isUploading = '1' === uploadForm.getAttribute('data-uploading');
+						submitButton.disabled = isUploading || selectedFiles.length < 1;
+
+						if (fileInput) {
+							fileInput.disabled = isUploading;
+						}
+						if (clearSelectedFilesBtn) {
+							clearSelectedFilesBtn.disabled = isUploading || selectedFiles.length < 1;
+						}
+						if (cancelMonitorBtn) {
+							cancelMonitorBtn.disabled = !isUploading;
+						}
+					}
+
+					function renderSelectedFilesList() {
+						if (!selectedFilesList || !selectedFilesWrap) {
+							return;
+						}
+
+						selectedFilesList.innerHTML = '';
+						if (!selectedFiles.length) {
+							selectedFilesWrap.hidden = true;
+							if (fileCountInfo) {
+								fileCountInfo.textContent = '';
+							}
+							updateUploadButtonsState();
+							return;
+						}
+
+						selectedFilesWrap.hidden = false;
+						selectedFiles.forEach(function(file, index) {
+							var item = document.createElement('li');
+							item.className = 'rawatwp-selected-files-item';
+							item.innerHTML = '' +
+								'<span class=\"rawatwp-selected-files-name\"></span>' +
+								'<button type=\"button\" class=\"button-link-delete rawatwp-selected-files-remove\" data-index=\"' + index + '\">Remove</button>';
+							item.querySelector('.rawatwp-selected-files-name').textContent = file.name;
+							selectedFilesList.appendChild(item);
+						});
+
+						if (fileCountInfo) {
+							fileCountInfo.textContent = selectedFiles.length + ' file(s) selected';
+						}
+						updateUploadButtonsState();
 					}
 
 					function createUploadRow(fileName) {
@@ -757,6 +847,21 @@ class AdminPages {
 						});
 					}
 
+					if (cancelMonitorBtn && uploadForm) {
+						cancelMonitorBtn.addEventListener('click', function() {
+							if ('1' !== uploadForm.getAttribute('data-uploading')) {
+								return;
+							}
+
+							cancelRequested = true;
+							setSummary('Cancel requested... finishing current file.');
+
+							if (activeXhr) {
+								activeXhr.abort();
+							}
+						});
+					}
+
 					if (checkAll) {
 						checkAll.addEventListener('change', function() {
 							rowChecks.forEach(function(item) {
@@ -770,25 +875,60 @@ class AdminPages {
 					}
 
 					fileInput.addEventListener('change', function() {
-						var count = fileInput.files ? fileInput.files.length : 0;
-						if (fileCountInfo) {
-							fileCountInfo.textContent = count > 0 ? (count + ' file(s) selected') : '';
-						}
+						selectedFiles = fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
+						renderSelectedFilesList();
 					});
 
+					if (selectedFilesList) {
+						selectedFilesList.addEventListener('click', function(event) {
+							var target = event.target;
+							if (!target || !target.classList.contains('rawatwp-selected-files-remove')) {
+								return;
+							}
+
+							if ('1' === uploadForm.getAttribute('data-uploading')) {
+								return;
+							}
+
+							var index = Number(target.getAttribute('data-index'));
+							if (Number.isNaN(index) || index < 0 || index >= selectedFiles.length) {
+								return;
+							}
+
+							selectedFiles.splice(index, 1);
+							syncInputFilesFromSelected();
+							renderSelectedFilesList();
+						});
+					}
+
+					if (clearSelectedFilesBtn) {
+						clearSelectedFilesBtn.addEventListener('click', function() {
+							if ('1' === uploadForm.getAttribute('data-uploading')) {
+								return;
+							}
+
+							selectedFiles = [];
+							syncInputFilesFromSelected();
+							renderSelectedFilesList();
+						});
+					}
+
 					uploadForm.addEventListener('submit', function(event) {
-						var files = fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
+						var files = selectedFiles.slice();
 						if ('1' === uploadForm.getAttribute('data-uploading')) {
 							event.preventDefault();
 							return;
 						}
 						if (!files.length) {
+							event.preventDefault();
 							return;
 						}
 
 						event.preventDefault();
 						uploadForm.setAttribute('data-uploading', '1');
-						submitButton.disabled = true;
+						cancelRequested = false;
+						activeXhr = null;
+						updateUploadButtonsState();
 
 						if (uploadMonitor) {
 							uploadMonitor.hidden = false;
@@ -820,10 +960,15 @@ class AdminPages {
 
 						function finishBatch() {
 							uploadForm.removeAttribute('data-uploading');
-							submitButton.disabled = false;
+							activeXhr = null;
 							refreshSummary();
+							updateUploadButtonsState();
 
-							if (success > 0) {
+							if (cancelRequested && success <= 0) {
+								setSummary('Upload canceled. No files were uploaded.');
+							} else if (cancelRequested && success > 0) {
+								setSummary('Upload canceled. Some files were uploaded successfully.');
+							} else if (success > 0) {
 								setSummary((failed > 0 ? 'Upload finished with some failures.' : 'Upload finished successfully.') + ' Refreshing package list...');
 								setTimeout(function() {
 									window.location.reload();
@@ -832,6 +977,17 @@ class AdminPages {
 						}
 
 						function uploadFileAt(index) {
+							if (cancelRequested) {
+								for (var i = index; i < files.length; i++) {
+									finished++;
+									failed++;
+									updateUploadRow(uploadedRows[i], 0, 'Upload canceled by user.', 'failed');
+								}
+								refreshSummary();
+								finishBatch();
+								return;
+							}
+
 							if (index >= files.length) {
 								finishBatch();
 								return;
@@ -846,6 +1002,7 @@ class AdminPages {
 							refreshSummary();
 
 							var xhr = new XMLHttpRequest();
+							activeXhr = xhr;
 							xhr.open('POST', ajaxUrl, true);
 							xhr.timeout = 900000;
 
@@ -879,6 +1036,7 @@ class AdminPages {
 
 							xhr.onload = function() {
 								window.clearInterval(stallWatcher);
+								activeXhr = null;
 								finished++;
 
 								var ok = false;
@@ -909,6 +1067,7 @@ class AdminPages {
 
 							xhr.onerror = function() {
 								window.clearInterval(stallWatcher);
+								activeXhr = null;
 								finished++;
 								failed++;
 								updateUploadRow(row, progressValue, 'Upload failed: network error.', 'failed');
@@ -918,15 +1077,21 @@ class AdminPages {
 
 							xhr.onabort = function() {
 								window.clearInterval(stallWatcher);
+								activeXhr = null;
 								finished++;
 								failed++;
-								updateUploadRow(row, progressValue, 'Upload interrupted: no activity detected.', 'failed');
+								if (cancelRequested) {
+									updateUploadRow(row, progressValue, 'Upload canceled by user.', 'failed');
+								} else {
+									updateUploadRow(row, progressValue, 'Upload interrupted: no activity detected.', 'failed');
+								}
 								refreshSummary();
 								uploadFileAt(index + 1);
 							};
 
 							xhr.ontimeout = function() {
 								window.clearInterval(stallWatcher);
+								activeXhr = null;
 								finished++;
 								failed++;
 								updateUploadRow(row, progressValue, 'Upload timeout: server did not respond in time.', 'failed');
@@ -943,6 +1108,8 @@ class AdminPages {
 
 						uploadFileAt(0);
 					});
+
+					renderSelectedFilesList();
 				})();
 				</script>
 			<?php endif; ?>

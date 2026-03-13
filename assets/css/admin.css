@@ -196,6 +196,49 @@
 	margin-bottom: var(--rawatwp-space-1);
 }
 
+.rawatwp-admin .rawatwp-selected-files {
+	margin-top: var(--rawatwp-space-1);
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	padding: 10px;
+	background: #fff;
+}
+
+.rawatwp-admin .rawatwp-selected-files-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.rawatwp-admin .rawatwp-selected-files-list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.rawatwp-admin .rawatwp-selected-files-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 0;
+	border-top: 1px solid #f0f0f1;
+}
+
+.rawatwp-admin .rawatwp-selected-files-item:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.rawatwp-admin .rawatwp-selected-files-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
 .rawatwp-admin .rawatwp-upload-monitor {
 	position: fixed;
 	right: 24px;
@@ -209,6 +252,12 @@
 	padding: 12px;
 	box-shadow: 0 8px 24px rgba(16, 24, 40, 0.2);
 	z-index: 100000;
+}
+
+.rawatwp-admin .rawatwp-upload-monitor-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .rawatwp-admin .rawatwp-upload-monitor-header {
