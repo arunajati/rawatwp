@@ -451,23 +451,70 @@ class ChildManager {
 	 * @return \WP_REST_Response
 	 */
 	public function rest_check_updates( \WP_REST_Request $request ) {
+		$packet = $request->get_json_params();
+		$result = $this->process_update_check_packet( is_array( $packet ) ? $packet : array() );
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$http_status = ( is_array( $error_data ) && isset( $error_data['http_status'] ) ) ? (int) $error_data['http_status'] : 500;
+			return new \WP_REST_Response(
+				array(
+					'status'  => 'failed',
+					'message' => sanitize_text_field( $result->get_error_message() ),
+				),
+				$http_status
+			);
+		}
+
+		return new \WP_REST_Response( $result, 200 );
+	}
+
+	/**
+	 * AJAX: check available WordPress updates on child site (fallback path for hosts with REST routing issues).
+	 *
+	 * @return void
+	 */
+	public function ajax_check_updates() {
+		$packet_raw = isset( $_POST['packet'] ) ? wp_unslash( (string) $_POST['packet'] ) : '';
+		$packet     = json_decode( $packet_raw, true );
+		$result     = $this->process_update_check_packet( is_array( $packet ) ? $packet : array() );
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$http_status = ( is_array( $error_data ) && isset( $error_data['http_status'] ) ) ? (int) $error_data['http_status'] : 500;
+			wp_send_json(
+				array(
+					'status'  => 'failed',
+					'message' => sanitize_text_field( $result->get_error_message() ),
+				),
+				$http_status
+			);
+		}
+
+		wp_send_json( $result, 200 );
+	}
+
+	/**
+	 * Shared checker for REST/AJAX update check requests.
+	 *
+	 * @param array $packet Signed packet payload.
+	 * @return array|\WP_Error
+	 */
+	private function process_update_check_packet( array $packet ) {
 		if ( ! $this->mode_manager->is_child() ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Mode is not child.' ), 403 );
+			return new \WP_Error( 'rawatwp_child_mode_only', 'Mode is not child.', array( 'http_status' => 403 ) );
 		}
 
 		$settings = $this->get_settings();
 		if ( '' === $settings['security_key'] ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Child security key is not set.' ), 400 );
+			return new \WP_Error( 'rawatwp_child_key_missing', 'Child security key is not set.', array( 'http_status' => 400 ) );
 		}
 
-		$packet = $request->get_json_params();
-		if ( ! is_array( $packet ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => 'Invalid JSON payload.' ), 400 );
+		if ( empty( $packet ) ) {
+			return new \WP_Error( 'rawatwp_child_bad_payload', 'Invalid request payload.', array( 'http_status' => 400 ) );
 		}
 
 		$verification = $this->security->verify_signed_packet( $packet, $settings['security_key'], 'child_check_updates' );
 		if ( is_wp_error( $verification ) ) {
-			return new \WP_REST_Response( array( 'status' => 'failed', 'message' => $verification->get_error_message() ), 403 );
+			return new \WP_Error( 'rawatwp_child_bad_signature', $verification->get_error_message(), array( 'http_status' => 403 ) );
 		}
 
 		$data          = isset( $packet['data'] ) && is_array( $packet['data'] ) ? $packet['data'] : array();
@@ -488,13 +535,7 @@ class ChildManager {
 				)
 			);
 
-			return new \WP_REST_Response(
-				array(
-					'status'  => 'failed',
-					'message' => 'Failed to check available updates on child site.',
-				),
-				500
-			);
+			return new \WP_Error( 'rawatwp_child_check_failed', 'Failed to check available updates on child site.', array( 'http_status' => 500 ) );
 		}
 
 		$this->logger->log(
@@ -512,14 +553,11 @@ class ChildManager {
 			)
 		);
 
-		return new \WP_REST_Response(
-			array(
-				'status'          => 'ok',
-				'message'         => 'Update check completed.',
-				'rawatwp_version' => $this->get_local_rawatwp_version(),
-				'updates'         => $snapshot,
-			),
-			200
+		return array(
+			'status'          => 'ok',
+			'message'         => 'Update check completed.',
+			'rawatwp_version' => $this->get_local_rawatwp_version(),
+			'updates'         => $snapshot,
 		);
 	}
 
@@ -558,27 +596,35 @@ class ChildManager {
 		$had_current_screen = array_key_exists( 'current_screen', $GLOBALS );
 		$previous_screen    = $had_current_screen ? $GLOBALS['current_screen'] : null;
 
-		if ( function_exists( 'set_current_screen' ) ) {
-			set_current_screen( 'dashboard' );
-		}
-
-		if ( $force_refresh ) {
-			if ( function_exists( 'wp_clean_update_cache' ) ) {
-				wp_clean_update_cache();
+		try {
+			if ( function_exists( 'set_current_screen' ) ) {
+				set_current_screen( 'dashboard' );
 			}
-			delete_site_transient( 'update_core' );
-			delete_site_transient( 'update_plugins' );
-			delete_site_transient( 'update_themes' );
-		}
 
-		wp_version_check( array(), true );
-		wp_update_plugins();
-		wp_update_themes();
+			if ( $force_refresh ) {
+				if ( function_exists( 'wp_clean_update_cache' ) ) {
+					wp_clean_update_cache();
+				}
+				delete_site_transient( 'update_core' );
+				delete_site_transient( 'update_plugins' );
+				delete_site_transient( 'update_themes' );
+			}
 
-		if ( $had_current_screen ) {
-			$GLOBALS['current_screen'] = $previous_screen;
-		} else {
-			unset( $GLOBALS['current_screen'] );
+			// Use no-argument calls for broad WordPress/PHP compatibility.
+			wp_version_check();
+			wp_update_plugins();
+			wp_update_themes();
+		} catch ( \Throwable $runtime_error ) {
+			return new \WP_Error(
+				'rawatwp_check_runtime_error',
+				sprintf( 'Update check runtime error: %s', sanitize_text_field( $runtime_error->getMessage() ) )
+			);
+		} finally {
+			if ( $had_current_screen ) {
+				$GLOBALS['current_screen'] = $previous_screen;
+			} else {
+				unset( $GLOBALS['current_screen'] );
+			}
 		}
 
 		$current_wp_version = sanitize_text_field( (string) get_bloginfo( 'version' ) );

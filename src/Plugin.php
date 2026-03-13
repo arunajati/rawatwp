@@ -103,6 +103,8 @@ class Plugin {
 			add_action( 'admin_enqueue_scripts', array( $this->admin_pages, 'enqueue_assets' ) );
 			add_action( 'admin_notices', array( $this->admin_pages, 'render_plugins_page_notices' ) );
 			add_filter( 'plugin_row_meta', array( $this->admin_pages, 'add_plugin_row_meta_check_update' ), 10, 4 );
+			add_action( 'wp_ajax_rawatwp_child_check_updates', array( $child_manager, 'ajax_check_updates' ) );
+			add_action( 'wp_ajax_nopriv_rawatwp_child_check_updates', array( $child_manager, 'ajax_check_updates' ) );
 
 		add_action(
 			'rawatwp_daily_github_update_check',

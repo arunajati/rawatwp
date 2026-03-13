@@ -966,6 +966,9 @@ class MasterManager {
 		if ( false !== stripos( $reason, 'No route was found matching the URL and request method.' ) ) {
 			$reason = 'Child site still uses an older RawatWP version. Run "Update RawatWP on All Sites" first, then check again.';
 		}
+		if ( false !== stripos( $reason, 'There has been a critical error on this website' ) ) {
+			$reason = 'Child site hit a runtime error while checking updates. Update RawatWP on child sites to the latest version, then retry.';
+		}
 		if ( '' === $reason ) {
 			$reason = __( 'Unable to contact child site for update check.', 'rawatwp' );
 		}
@@ -1009,7 +1012,6 @@ class MasterManager {
 	 * Send child update-check request with transient retry policy.
 	 *
 	 * @param array  $site         Site row.
-	 * @param string $endpoint     Child endpoint.
 	 * @param array  $request_data Signed payload data.
 	 * @return array|\WP_Error
 	 */
@@ -1020,20 +1022,31 @@ class MasterManager {
 		$no_route_hit = false;
 
 		foreach ( $endpoints as $endpoint ) {
+			$is_ajax_endpoint = false !== strpos( $endpoint, 'admin-ajax.php' );
 			for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
 				$packet = $this->security->build_signed_packet( $request_data, $site['security_key'] );
+				$request_args = array(
+					'timeout'         => 40,
+					'connect_timeout' => 8,
+					'redirection'     => 3,
+					'headers'         => array(
+						'X-RawatWP-Request' => 'site-update-check',
+					),
+				);
+				if ( $is_ajax_endpoint ) {
+					$request_args['headers']['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
+					$request_args['body']                     = array(
+						'action' => 'rawatwp_child_check_updates',
+						'packet' => wp_json_encode( $packet ),
+					);
+				} else {
+					$request_args['headers']['Content-Type'] = 'application/json';
+					$request_args['body']                    = wp_json_encode( $packet );
+				}
+
 				$result = wp_remote_post(
 					$endpoint,
-					array(
-						'timeout'         => 40,
-						'connect_timeout' => 8,
-						'redirection'     => 3,
-						'headers'         => array(
-							'Content-Type'      => 'application/json',
-							'X-RawatWP-Request' => 'site-update-check',
-						),
-						'body'            => wp_json_encode( $packet ),
-					)
+					$request_args
 				);
 
 				if ( is_wp_error( $result ) ) {
@@ -1046,9 +1059,15 @@ class MasterManager {
 				}
 
 				$http_code = (int) wp_remote_retrieve_response_code( $result );
-				$body      = json_decode( (string) wp_remote_retrieve_body( $result ), true );
+				$raw_body  = trim( (string) wp_remote_retrieve_body( $result ) );
+				$body      = json_decode( $raw_body, true );
 				$is_no_route = ( 404 === $http_code && is_array( $body ) && isset( $body['code'] ) && 'rest_no_route' === sanitize_key( (string) $body['code'] ) );
+				$is_missing_ajax_action = ( $is_ajax_endpoint && '0' === $raw_body );
 				if ( $is_no_route ) {
+					$no_route_hit = true;
+					break;
+				}
+				if ( $is_missing_ajax_action ) {
 					$no_route_hit = true;
 					break;
 				}
@@ -1121,12 +1140,25 @@ class MasterManager {
 			return array();
 		}
 
+		$root = '';
+		$parts = wp_parse_url( $base );
+		if ( is_array( $parts ) && ! empty( $parts['scheme'] ) && ! empty( $parts['host'] ) ) {
+			$root = $parts['scheme'] . '://' . $parts['host'];
+			if ( ! empty( $parts['port'] ) ) {
+				$root .= ':' . (int) $parts['port'];
+			}
+		}
+
 		return array_values(
-			array_unique(
+			array_filter(
+				array_unique(
 				array(
 					$base . '/wp-json/rawatwp/v1/child/check-updates',
 					$base . '/index.php?rest_route=/rawatwp/v1/child/check-updates',
 					$base . '/?rest_route=/rawatwp/v1/child/check-updates',
+					$base . '/wp-admin/admin-ajax.php',
+					'' !== $root ? $root . '/wp-admin/admin-ajax.php' : '',
+				)
 				)
 			)
 		);

@@ -1909,6 +1909,9 @@ class AdminPages {
 			if ( false !== stripos( $reason, 'endpoint is not available' ) || false !== stripos( $reason, 'No route was found matching the URL and request method.' ) ) {
 				$reason = 'Child site still uses an older RawatWP version. Please run "Update RawatWP on All Sites" first.';
 			}
+			if ( false !== stripos( $reason, 'There has been a critical error on this website' ) ) {
+				$reason = 'Child site hit a runtime error while checking updates. Please update child RawatWP to latest version and try again.';
+			}
 			$error        = sprintf( 'Some sites failed. First failure: %s (%s)', $site_name, $reason );
 		}
 
