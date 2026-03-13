@@ -852,6 +852,45 @@ class Database {
 	}
 
 	/**
+	 * Get blocking predecessor queue item (same batch + site, lower ID, not success).
+	 *
+	 * @param string $batch_id Batch ID.
+	 * @param int    $site_id Site ID.
+	 * @param int    $queue_id Current queue ID.
+	 * @return array|null
+	 */
+	public function get_blocking_predecessor_queue_item( $batch_id, $site_id, $queue_id ) {
+		global $wpdb;
+
+		$batch_id = sanitize_text_field( (string) $batch_id );
+		$site_id  = (int) $site_id;
+		$queue_id = (int) $queue_id;
+
+		if ( '' === $batch_id || $site_id <= 0 || $queue_id <= 0 ) {
+			return null;
+		}
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare(
+				"SELECT * FROM {$this->table( 'queue' )}
+				WHERE batch_id = %s
+					AND site_id = %d
+					AND id < %d
+					AND status <> %s
+				ORDER BY id ASC
+				LIMIT 1",
+				$batch_id,
+				$site_id,
+				$queue_id,
+				'success'
+			),
+			ARRAY_A
+		);
+
+		return is_array( $row ) ? $row : null;
+	}
+
+	/**
 	 * Get queue items.
 	 *
 	 * @param int    $limit Limit.

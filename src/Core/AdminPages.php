@@ -1890,12 +1890,28 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-updates', '', $result->get_error_message() );
 		}
 
-		$message = sprintf(
-			'Queue created. Batch: %s | On queue: %d | Skipped: %d',
-			$result['batch_id'],
-			(int) $result['queued'],
-			(int) $result['skipped']
-		);
+		if ( ! empty( $result['is_patch_sequence'] ) ) {
+			$numbers_text = '';
+			if ( ! empty( $result['patch_numbers'] ) && is_array( $result['patch_numbers'] ) ) {
+				$numbers_text = implode( ' -> ', array_map( 'intval', $result['patch_numbers'] ) );
+			}
+
+			$message = sprintf(
+				'Patch sequence queued. Batch: %s | Patch flow: %s | Sites: %d | Queue items: %d | Skipped: %d',
+				$result['batch_id'],
+				'' !== $numbers_text ? $numbers_text : '-',
+				isset( $result['site_count'] ) ? (int) $result['site_count'] : count( $site_ids ),
+				(int) $result['queued'],
+				(int) $result['skipped']
+			);
+		} else {
+			$message = sprintf(
+				'Queue created. Batch: %s | On queue: %d | Skipped: %d',
+				$result['batch_id'],
+				(int) $result['queued'],
+				(int) $result['skipped']
+			);
+		}
 		$this->redirect_with_notice( 'rawatwp-updates', $message, '' );
 	}
 
