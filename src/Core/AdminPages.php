@@ -1906,6 +1906,9 @@ class AdminPages {
 			$first_failed = $summary['failed'][0];
 			$site_name    = isset( $first_failed['site_name'] ) ? sanitize_text_field( (string) $first_failed['site_name'] ) : 'Child site';
 			$reason       = isset( $first_failed['message'] ) ? sanitize_text_field( (string) $first_failed['message'] ) : 'Unknown error.';
+			if ( false !== stripos( $reason, 'endpoint is not available' ) || false !== stripos( $reason, 'No route was found matching the URL and request method.' ) ) {
+				$reason = 'Child site still uses an older RawatWP version. Please run "Update RawatWP on All Sites" first.';
+			}
 			$error        = sprintf( 'Some sites failed. First failure: %s (%s)', $site_name, $reason );
 		}
 

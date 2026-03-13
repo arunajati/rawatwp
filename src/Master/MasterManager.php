@@ -217,14 +217,13 @@ class MasterManager {
 			)
 		);
 
-		$endpoint = untrailingslashit( $site['site_url'] ) . '/wp-json/rawatwp/v1/child/check-updates';
 		$request_data = array(
 			'site_url'       => home_url(),
 			'force_refresh'  => true,
 			'request_source' => 'master_manual',
 		);
 
-		$response = $this->post_child_update_check_with_retry( $site, $endpoint, $request_data );
+		$response = $this->post_child_update_check_with_retry( $site, $request_data );
 
 		if ( is_wp_error( $response ) ) {
 			$detail = sanitize_text_field( $response->get_error_message() );
@@ -964,6 +963,9 @@ class MasterManager {
 	 */
 	private function persist_failed_site_update_snapshot( array $site, $reason ) {
 		$reason = sanitize_text_field( (string) $reason );
+		if ( false !== stripos( $reason, 'No route was found matching the URL and request method.' ) ) {
+			$reason = 'Child site still uses an older RawatWP version. Run "Update RawatWP on All Sites" first, then check again.';
+		}
 		if ( '' === $reason ) {
 			$reason = __( 'Unable to contact child site for update check.', 'rawatwp' );
 		}
@@ -1011,42 +1013,60 @@ class MasterManager {
 	 * @param array  $request_data Signed payload data.
 	 * @return array|\WP_Error
 	 */
-	private function post_child_update_check_with_retry( array $site, $endpoint, array $request_data ) {
+	private function post_child_update_check_with_retry( array $site, array $request_data ) {
 		$max_attempts = 3;
 		$last_error   = null;
+		$endpoints    = $this->get_child_update_check_endpoints( $site );
+		$no_route_hit = false;
 
-		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
-			$packet = $this->security->build_signed_packet( $request_data, $site['security_key'] );
-			$result = wp_remote_post(
-				$endpoint,
-				array(
-					'timeout'         => 40,
-					'connect_timeout' => 8,
-					'redirection'     => 3,
-					'headers'         => array(
-						'Content-Type'      => 'application/json',
-						'X-RawatWP-Request' => 'site-update-check',
-					),
-					'body'            => wp_json_encode( $packet ),
-				)
-			);
+		foreach ( $endpoints as $endpoint ) {
+			for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+				$packet = $this->security->build_signed_packet( $request_data, $site['security_key'] );
+				$result = wp_remote_post(
+					$endpoint,
+					array(
+						'timeout'         => 40,
+						'connect_timeout' => 8,
+						'redirection'     => 3,
+						'headers'         => array(
+							'Content-Type'      => 'application/json',
+							'X-RawatWP-Request' => 'site-update-check',
+						),
+						'body'            => wp_json_encode( $packet ),
+					)
+				);
 
-			if ( is_wp_error( $result ) ) {
-				$last_error = $result;
-				if ( $attempt < $max_attempts && $this->is_transient_http_error( 0, $result->get_error_message() ) ) {
+				if ( is_wp_error( $result ) ) {
+					$last_error = $result;
+					if ( $attempt < $max_attempts && $this->is_transient_http_error( 0, $result->get_error_message() ) ) {
+						sleep( 1 );
+						continue;
+					}
+					break;
+				}
+
+				$http_code = (int) wp_remote_retrieve_response_code( $result );
+				$body      = json_decode( (string) wp_remote_retrieve_body( $result ), true );
+				$is_no_route = ( 404 === $http_code && is_array( $body ) && isset( $body['code'] ) && 'rest_no_route' === sanitize_key( (string) $body['code'] ) );
+				if ( $is_no_route ) {
+					$no_route_hit = true;
+					break;
+				}
+
+				if ( $attempt < $max_attempts && $this->is_transient_http_error( $http_code, '' ) ) {
 					sleep( 1 );
 					continue;
 				}
+
 				return $result;
 			}
+		}
 
-			$http_code = (int) wp_remote_retrieve_response_code( $result );
-			if ( $attempt < $max_attempts && $this->is_transient_http_error( $http_code, '' ) ) {
-				sleep( 1 );
-				continue;
-			}
-
-			return $result;
+		if ( $no_route_hit ) {
+			return new \WP_Error(
+				'rawatwp_check_no_route',
+				__( 'Child update-check endpoint is not available. Update RawatWP on child site first, then run check again.', 'rawatwp' )
+			);
 		}
 
 		return $last_error instanceof \WP_Error ? $last_error : new \WP_Error( 'rawatwp_check_failed', __( 'Could not connect to child site.', 'rawatwp' ) );
@@ -1087,5 +1107,28 @@ class MasterManager {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Build fallback REST endpoint candidates for child update-check.
+	 *
+	 * @param array $site Child site row.
+	 * @return array
+	 */
+	private function get_child_update_check_endpoints( array $site ) {
+		$base = isset( $site['site_url'] ) ? untrailingslashit( (string) $site['site_url'] ) : '';
+		if ( '' === $base ) {
+			return array();
+		}
+
+		return array_values(
+			array_unique(
+				array(
+					$base . '/wp-json/rawatwp/v1/child/check-updates',
+					$base . '/index.php?rest_route=/rawatwp/v1/child/check-updates',
+					$base . '/?rest_route=/rawatwp/v1/child/check-updates',
+				)
+			)
+		);
 	}
 }
