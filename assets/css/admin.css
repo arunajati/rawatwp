@@ -596,6 +596,78 @@
 	font-size: 12px;
 }
 
+.rawatwp-admin .rawatwp-progress-warning {
+	margin: 0 0 var(--rawatwp-space-1);
+	padding: 10px 12px;
+	border-left: 3px solid #dba617;
+	background: #fff8e5;
+	border-radius: 6px;
+}
+
+body.rawatwp-modal-open {
+	overflow: hidden;
+}
+
+.rawatwp-admin .rawatwp-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+}
+
+.rawatwp-admin .rawatwp-modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(15, 23, 42, 0.45);
+	backdrop-filter: blur(2px);
+}
+
+.rawatwp-admin .rawatwp-modal-dialog {
+	position: relative;
+	z-index: 1;
+	width: min(900px, calc(100vw - 40px));
+	max-height: calc(100vh - 40px);
+	overflow: auto;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 12px;
+	box-shadow: 0 24px 48px rgba(2, 6, 23, 0.24);
+	padding: 18px;
+}
+
+.rawatwp-admin .rawatwp-modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 14px;
+}
+
+.rawatwp-admin .rawatwp-modal-header h2 {
+	margin: 0;
+	font-size: 22px;
+}
+
+.rawatwp-admin .rawatwp-modal-body {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+}
+
+.rawatwp-admin .rawatwp-modal-section .rawatwp-updates-site-list {
+	max-height: 320px;
+}
+
+.rawatwp-admin .rawatwp-modal-footer {
+	margin-top: 14px;
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
 .rawatwp-admin .rawatwp-status-badge {
 	display: inline-block;
 	padding: 2px 8px;
@@ -782,5 +854,19 @@
 	.rawatwp-admin .rawatwp-site-health-head {
 		flex-direction: column;
 		align-items: flex-start;
+	}
+
+	.rawatwp-admin .rawatwp-modal {
+		padding: 12px;
+	}
+
+	.rawatwp-admin .rawatwp-modal-dialog {
+		width: calc(100vw - 24px);
+		max-height: calc(100vh - 24px);
+		padding: 14px;
+	}
+
+	.rawatwp-admin .rawatwp-modal-body {
+		grid-template-columns: 1fr;
 	}
 }
