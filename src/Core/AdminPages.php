@@ -1660,6 +1660,18 @@ class AdminPages {
 						var packageChecks = document.querySelectorAll('.rawatwp-package-check');
 						var workerBusy = false;
 
+						function setLoadingOverlay(show, message) {
+							window.dispatchEvent(new CustomEvent('rawatwp:loading', {
+								detail: {
+									show: !!show,
+									message: message || 'Processing your request...'
+								}
+							}));
+							if (typeof window.rawatwpSetLoadingOverlay === 'function') {
+								window.rawatwpSetLoadingOverlay(!!show, message || 'Processing your request...');
+							}
+						}
+
 						if (selectAllSites) {
 							selectAllSites.addEventListener('change', function() {
 								siteChecks.forEach(function(item) {
@@ -1751,12 +1763,7 @@ class AdminPages {
 								}
 
 								closeDeployModal();
-								window.dispatchEvent(new CustomEvent('rawatwp:loading', {
-									detail: {
-										show: true,
-										message: 'Queuing updates for selected child sites...'
-									}
-								}));
+								setLoadingOverlay(true, 'Queuing updates for selected child sites...');
 							});
 						}
 
@@ -1797,9 +1804,8 @@ class AdminPages {
 							})
 							.catch(function() {
 								workerBusy = false;
-								window.dispatchEvent(new CustomEvent('rawatwp:loading', {
-									detail: { show: false }
-								}));
+								window.rawatwpLoadingLock = false;
+								setLoadingOverlay(false, 'Processing your request...');
 							})
 							.finally(function() {
 								workerBusy = false;
@@ -1807,16 +1813,14 @@ class AdminPages {
 						}
 
 						if (hasPending && !paused) {
-							window.dispatchEvent(new CustomEvent('rawatwp:loading', {
-								detail: {
-									show: true,
-									message: currentOverlayMessage()
-								}
-							}));
+							window.rawatwpLoadingLock = true;
+							setLoadingOverlay(true, currentOverlayMessage());
 							setTimeout(runBrowserWorkerStep, 500);
 							setTimeout(function() {
 								window.location.reload();
 							}, 12000);
+						} else {
+							window.rawatwpLoadingLock = false;
 						}
 					})();
 					</script>

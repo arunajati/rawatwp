@@ -227,6 +227,25 @@
 		overlay.setAttribute('aria-hidden', 'true');
 	}
 
+	function exposeLoadingOverlayApi() {
+		if (window.rawatwpSetLoadingOverlay) {
+			return;
+		}
+
+		window.rawatwpSetLoadingOverlay = function(show, message) {
+			var applyState = function() {
+				setLoadingOverlayState(show, message);
+			};
+
+			if (document.body) {
+				applyState();
+				return;
+			}
+
+			document.addEventListener('DOMContentLoaded', applyState, { once: true });
+		};
+	}
+
 	function bindLoadingForms() {
 		var forms = document.querySelectorAll('form[data-rawatwp-loading="1"]');
 		if (!forms.length) {
@@ -255,8 +274,12 @@
 
 	function initLoadingUi() {
 		ensureLoadingOverlay();
+		exposeLoadingOverlayApi();
 		bindLoadingForms();
 		window.addEventListener('pageshow', function() {
+			if (window.rawatwpLoadingLock) {
+				return;
+			}
 			setLoadingOverlayState(false, 'Processing your request...');
 		});
 
