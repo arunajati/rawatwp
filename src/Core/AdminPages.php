@@ -254,7 +254,7 @@ class AdminPages {
 			<p class="rawatwp-page-subtitle">Main settings for RawatWP.</p>
 			<?php $this->render_notices(); ?>
 			<div class="rawatwp-card">
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="Saving settings...">
 					<?php wp_nonce_field( 'rawatwp_save_general_settings' ); ?>
 					<input type="hidden" name="action" value="rawatwp_save_general_settings" />
 					<div class="rawatwp-field-stack">
@@ -410,7 +410,7 @@ class AdminPages {
 				$required_attr = $is_connected ? '' : 'required';
 				?>
 				<div class="rawatwp-card">
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="<?php echo esc_attr( $is_connected ? 'Disconnecting from Master...' : 'Connecting to Master...' ); ?>">
 						<?php wp_nonce_field( $nonce_action ); ?>
 						<input type="hidden" name="action" value="<?php echo esc_attr( $form_action ); ?>" />
 						<table class="form-table" role="presentation">
@@ -558,7 +558,7 @@ class AdminPages {
 				$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
 				?>
 				<div class="rawatwp-card">
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="Adding child site...">
 						<?php wp_nonce_field( 'rawatwp_add_site' ); ?>
 						<input type="hidden" name="action" value="rawatwp_add_site" />
 						<div class="rawatwp-field-stack">
@@ -578,7 +578,7 @@ class AdminPages {
 				<div class="rawatwp-card">
 					<div class="rawatwp-card-header">
 						<h2>Child Site List</h2>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');">
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Queue RawatWP update to all connected child sites now?');" data-rawatwp-loading="1" data-rawatwp-loading-message="Queuing RawatWP update to all connected sites...">
 							<?php wp_nonce_field( 'rawatwp_queue_rawatwp_update_all_sites' ); ?>
 							<input type="hidden" name="action" value="rawatwp_queue_rawatwp_update_all_sites" />
 							<?php submit_button( 'Update RawatWP on All Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
@@ -738,13 +738,13 @@ class AdminPages {
 				<div class="rawatwp-card">
 					<div class="rawatwp-card-header">
 						<h2>Package List</h2>
-						<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="Scanning available packages...">
 							<?php wp_nonce_field( 'rawatwp_scan_updates_folder' ); ?>
 							<input type="hidden" name="action" value="rawatwp_scan_updates_folder" />
 							<?php submit_button( 'Scan Available Packages', 'secondary', 'submit', false ); ?>
 						</form>
 					</div>
-					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete all selected packages? The zip files and package data will be permanently removed.');">
+					<form id="rawatwp-bulk-delete-packages" class="rawatwp-package-bulk-actions" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete all selected packages? The zip files and package data will be permanently removed.');" data-rawatwp-loading="1" data-rawatwp-loading-message="Deleting selected packages...">
 						<?php wp_nonce_field( 'rawatwp_bulk_delete_packages' ); ?>
 						<input type="hidden" name="action" value="rawatwp_bulk_delete_packages" />
 						<select name="bulk_action" required>
@@ -796,7 +796,7 @@ class AdminPages {
 									<td><?php echo esc_html( $this->format_package_file_name_for_display( $package ) ); ?></td>
 									<td><?php echo esc_html( $this->format_datetime_for_display( isset( $package['created_at'] ) ? $package['created_at'] : '' ) ); ?></td>
 									<td>
-										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this package? The zip file and package data will be permanently removed.');">
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Delete this package? The zip file and package data will be permanently removed.');" data-rawatwp-loading="1" data-rawatwp-loading-message="Deleting package...">
 											<?php wp_nonce_field( 'rawatwp_delete_package' ); ?>
 											<input type="hidden" name="action" value="rawatwp_delete_package" />
 											<input type="hidden" name="package_id" value="<?php echo esc_attr( (string) $package['id'] ); ?>" />
@@ -1358,13 +1358,13 @@ class AdminPages {
 						</div>
 
 						<div class="rawatwp-updates-controls">
-							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="Running queue...">
 								<?php wp_nonce_field( 'rawatwp_queue_run_now' ); ?>
 								<input type="hidden" name="action" value="rawatwp_queue_run_now" />
 								<?php submit_button( 'Run Queue Now', 'secondary', 'submit', false ); ?>
 							</form>
 
-							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="<?php echo esc_attr( $queue_paused ? 'Resuming queue...' : 'Pausing queue...' ); ?>">
 								<?php wp_nonce_field( 'rawatwp_queue_pause_toggle' ); ?>
 								<input type="hidden" name="action" value="rawatwp_queue_pause_toggle" />
 								<input type="hidden" name="pause_value" value="<?php echo $queue_paused ? '0' : '1'; ?>" />
@@ -1378,7 +1378,7 @@ class AdminPages {
 
 						<div class="rawatwp-card">
 							<h2>Send Update</h2>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-rawatwp-loading="1" data-rawatwp-loading-message="Queuing updates for selected child sites...">
 						<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
 						<input type="hidden" name="action" value="rawatwp_push_update" />
 						<table class="form-table" role="presentation">
@@ -1433,7 +1433,7 @@ class AdminPages {
 					<div class="rawatwp-card" id="rawatwp-update-progress">
 						<div class="rawatwp-card-header">
 							<h2>Update Progress</h2>
-							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all completed update progress rows? Running queue items will stay untouched.');">
+							<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all completed update progress rows? Running queue items will stay untouched.');" data-rawatwp-loading="1" data-rawatwp-loading-message="Clearing completed update progress...">
 								<?php wp_nonce_field( 'rawatwp_clear_update_progress' ); ?>
 								<input type="hidden" name="action" value="rawatwp_clear_update_progress" />
 								<?php submit_button( 'Clear Progress', 'secondary', 'submit', false ); ?>
@@ -1615,7 +1615,7 @@ class AdminPages {
 					</tbody>
 				</table>
 				<div class="rawatwp-log-actions">
-					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all RawatWP logs?');">
+					<form class="rawatwp-inline-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Clear all RawatWP logs?');" data-rawatwp-loading="1" data-rawatwp-loading-message="Clearing logs...">
 						<?php wp_nonce_field( 'rawatwp_clear_logs' ); ?>
 						<input type="hidden" name="action" value="rawatwp_clear_logs" />
 						<?php submit_button( 'Clear Logs', 'secondary', 'submit', false ); ?>
@@ -2682,7 +2682,7 @@ class AdminPages {
 		<div class="rawatwp-card" id="rawatwp-update-health">
 			<div class="rawatwp-card-header">
 				<h2>Update Health Overview</h2>
-				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');" data-rawatwp-loading="1" data-rawatwp-loading-message="Checking updates on all connected sites...">
 					<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
 					<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
 					<?php submit_button( 'Check All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
