@@ -1871,55 +1871,30 @@ class AdminPages {
 			$this->redirect_with_notice( 'rawatwp-sites', '', 'No connected child sites found.' );
 		}
 
-		$summary      = $this->master_manager->request_site_updates_snapshot_batch( $site_ids );
-		$success_count = isset( $summary['success'] ) && is_array( $summary['success'] ) ? count( $summary['success'] ) : 0;
-		$failed_count  = isset( $summary['failed'] ) && is_array( $summary['failed'] ) ? count( $summary['failed'] ) : 0;
-		$total_count   = $success_count + $failed_count;
-		$pending_total = 0;
-		$sites_with_updates = 0;
-		if ( ! empty( $summary['success'] ) && is_array( $summary['success'] ) ) {
-			foreach ( $summary['success'] as $success_item ) {
-				if ( ! is_array( $success_item ) || empty( $success_item['snapshot'] ) || ! is_array( $success_item['snapshot'] ) ) {
-					continue;
-				}
-				$snapshot_total = isset( $success_item['snapshot']['counts']['total'] ) ? (int) $success_item['snapshot']['counts']['total'] : 0;
-				if ( $snapshot_total > 0 ) {
-					++$sites_with_updates;
-					$pending_total += $snapshot_total;
-				}
-			}
+		$result = $this->queue_manager->enqueue_update_check_batch( $site_ids );
+		if ( is_wp_error( $result ) ) {
+			$this->redirect_with_notice( 'rawatwp-sites', '', $result->get_error_message() );
 		}
 
+		$queued  = isset( $result['queued'] ) ? (int) $result['queued'] : 0;
+		$skipped = isset( $result['skipped'] ) ? (int) $result['skipped'] : 0;
+
 		$notice = sprintf(
-			'Update check finished for %d site(s). Success: %d, Failed: %d, Sites with updates: %d, Pending items: %d.',
-			$total_count,
-			$success_count,
-			$failed_count,
-			$sites_with_updates,
-			$pending_total
+			'Update check has been queued for %d connected site(s). You can monitor progress in "Update Progress".',
+			$queued
 		);
-		$error = '';
-		if ( $failed_count > 0 ) {
-			$first_failed = $summary['failed'][0];
-			$site_name    = isset( $first_failed['site_name'] ) ? sanitize_text_field( (string) $first_failed['site_name'] ) : 'Child site';
-			$reason       = isset( $first_failed['message'] ) ? sanitize_text_field( (string) $first_failed['message'] ) : 'Unknown error.';
-			if ( false !== stripos( $reason, 'endpoint is not available' ) || false !== stripos( $reason, 'No route was found matching the URL and request method.' ) ) {
-				$reason = 'Child site still uses an older RawatWP version. Please run "Update RawatWP on All Sites" first.';
-			}
-			if ( false !== stripos( $reason, 'There has been a critical error on this website' ) ) {
-				$reason = 'Child site hit a runtime error while checking updates. Please update child RawatWP to latest version and try again.';
-			}
-			$error        = sprintf( 'Some sites failed. First failure: %s (%s)', $site_name, $reason );
+		if ( $skipped > 0 ) {
+			$notice .= ' ' . sprintf( '%d site(s) were skipped because they are unavailable or disconnected.', $skipped );
 		}
 
 		$url = add_query_arg(
 			array(
-				'page' => 'rawatwp-sites',
+				'page' => 'rawatwp-updates',
 			),
 			admin_url( 'admin.php' )
-		) . '#rawatwp-update-health';
+		) . '#rawatwp-update-progress';
 
-		$this->redirect_to_url_with_notice( $url, $notice, $error );
+		$this->redirect_to_url_with_notice( $url, $notice, '' );
 	}
 
 	/**
@@ -2932,6 +2907,10 @@ class AdminPages {
 		if ( 'queue_created' === $action ) {
 			$queued  = isset( $context['queued'] ) ? (int) $context['queued'] : 0;
 			$skipped = isset( $context['skipped'] ) ? (int) $context['skipped'] : 0;
+			$queue_kind = isset( $context['queue_kind'] ) ? sanitize_key( (string) $context['queue_kind'] ) : '';
+			if ( 'check_updates' === $queue_kind ) {
+				return sprintf( 'Update-check queue created: %d site(s) ready, %d skipped.', $queued, $skipped );
+			}
 			return sprintf( 'Update queue created: %d site(s) ready, %d skipped.', $queued, $skipped );
 		}
 

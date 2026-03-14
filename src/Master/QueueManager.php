@@ -10,6 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class QueueManager {
 	/**
+	 * Queue reason code: run WordPress update check on child site.
+	 */
+	const REASON_CHECK_UPDATES = 'check_updates';
+
+	/**
 	 * Queue lock transient key.
 	 */
 	const LOCK_KEY = 'rawatwp_queue_lock';
@@ -228,6 +233,90 @@ class QueueManager {
 	}
 
 	/**
+	 * Enqueue update-check job for multiple child sites.
+	 *
+	 * @param array $site_ids Site IDs.
+	 * @return array|\WP_Error
+	 */
+	public function enqueue_update_check_batch( array $site_ids ) {
+		$site_ids = array_values( array_unique( array_filter( array_map( 'intval', $site_ids ) ) ) );
+		if ( empty( $site_ids ) ) {
+			return new \WP_Error( 'rawatwp_empty_sites', __( 'Select at least one child site.', 'rawatwp' ) );
+		}
+
+		$batch_id   = 'check-' . gmdate( 'YmdHis' ) . '-' . wp_generate_password( 8, false, false );
+		$queued     = 0;
+		$skipped    = 0;
+		$site_count = 0;
+
+		foreach ( $site_ids as $site_id ) {
+			$site = $this->database->get_site_by_id( $site_id );
+			if ( ! $site ) {
+				++$skipped;
+				continue;
+			}
+
+			if ( 'connected' !== sanitize_key( (string) $site['connection_status'] ) ) {
+				++$skipped;
+				continue;
+			}
+
+			++$site_count;
+			$queue_id = $this->database->insert_queue_item(
+				array(
+					'batch_id'     => $batch_id,
+					'site_id'      => $site_id,
+					'package_id'   => 0,
+					'status'       => 'on_queue',
+					'progress'     => 0.0,
+					'message'      => 'Added to update-check queue.',
+					'reason_code'  => self::REASON_CHECK_UPDATES,
+					'attempts'     => 0,
+					'max_attempts' => self::MAX_ATTEMPTS,
+					'next_run_at'  => current_time( 'mysql' ),
+				)
+			);
+
+			if ( false === $queue_id ) {
+				++$skipped;
+				continue;
+			}
+
+			++$queued;
+		}
+
+		if ( $queued <= 0 ) {
+			return new \WP_Error( 'rawatwp_queue_failed', __( 'Failed to enqueue update-check task.', 'rawatwp' ) );
+		}
+
+		$this->logger->log(
+			array(
+				'mode'      => 'master',
+				'action'    => 'queue_created',
+				'status'    => 'on_queue',
+				'item_type' => 'core',
+				'item_slug' => 'wp-update-check',
+				'message'   => sprintf( 'Update-check queue %s created. %d item(s) queued, %d skipped.', $batch_id, $queued, $skipped ),
+				'context'   => array(
+					'batch_id'   => $batch_id,
+					'queued'     => $queued,
+					'skipped'    => $skipped,
+					'site_count' => $site_count,
+					'queue_kind' => self::REASON_CHECK_UPDATES,
+				),
+			)
+		);
+
+		return array(
+			'batch_id'   => $batch_id,
+			'queued'     => $queued,
+			'skipped'    => $skipped,
+			'site_count' => $site_count,
+			'queue_kind' => self::REASON_CHECK_UPDATES,
+		);
+	}
+
+	/**
 	 * Run queue worker for N items.
 	 *
 	 * @param string $source Worker source.
@@ -335,9 +424,19 @@ class QueueManager {
 
 			$row['site_name']  = $site ? $site['site_name'] : 'Unknown site';
 			$row['site_url']   = $site ? $site['site_url'] : '';
-			$row['item_label'] = $package ? $package['label'] : 'Unknown package';
-			$row['item_type']  = $package ? $package['type'] : '';
-			$row['item_slug']  = $package ? $package['target_slug'] : '';
+			if ( $package ) {
+				$row['item_label'] = $package['label'];
+				$row['item_type']  = $package['type'];
+				$row['item_slug']  = $package['target_slug'];
+			} elseif ( $this->is_check_updates_queue_item( $row ) ) {
+				$row['item_label'] = 'Check updates (core/theme/plugin)';
+				$row['item_type']  = '';
+				$row['item_slug']  = '';
+			} else {
+				$row['item_label'] = 'Unknown package';
+				$row['item_type']  = '';
+				$row['item_slug']  = '';
+			}
 		}
 
 		return $rows;
@@ -371,17 +470,37 @@ class QueueManager {
 	private function process_claimed_item( array $item, $worker_id ) {
 		$queue_id = (int) $item['id'];
 		$site     = $this->database->get_site_by_id( (int) $item['site_id'] );
-		$package  = $this->package_manager->get_package( (int) $item['package_id'] );
-
-		if ( ! $site || ! $package ) {
+		if ( ! $site ) {
 			$this->database->update_queue_item(
 				$queue_id,
 				array(
 					'status'      => 'failed',
 					'progress'    => 100.0,
 					'reason_code' => 'invalid_target',
-					'message'     => 'Failed: site or package data was not found.',
-					'last_error'  => 'Site/package not found while processing.',
+					'message'     => 'Failed: child site data was not found.',
+					'last_error'  => 'Site was not found while processing queue item.',
+					'finished_at' => current_time( 'mysql' ),
+					'worker_id'   => null,
+				)
+			);
+			return;
+		}
+
+		if ( $this->is_check_updates_queue_item( $item ) ) {
+			$this->process_claimed_check_updates_item( $item, $site, $worker_id );
+			return;
+		}
+
+		$package  = $this->package_manager->get_package( (int) $item['package_id'] );
+		if ( ! $package ) {
+			$this->database->update_queue_item(
+				$queue_id,
+				array(
+					'status'      => 'failed',
+					'progress'    => 100.0,
+					'reason_code' => 'invalid_target',
+					'message'     => 'Failed: update package data was not found.',
+					'last_error'  => 'Package was not found while processing queue item.',
 					'finished_at' => current_time( 'mysql' ),
 					'worker_id'   => null,
 				)
@@ -498,6 +617,161 @@ class QueueManager {
 				'worker_id'   => null,
 			)
 		);
+	}
+
+	/**
+	 * Process one claimed queue item that checks native WordPress updates on child site.
+	 *
+	 * @param array  $item Claimed queue row.
+	 * @param array  $site Site row.
+	 * @param string $worker_id Worker ID.
+	 * @return void
+	 */
+	private function process_claimed_check_updates_item( array $item, array $site, $worker_id ) {
+		$queue_id = (int) $item['id'];
+		$this->database->touch_queue_heartbeat( $queue_id, $worker_id );
+		$this->database->update_queue_item(
+			$queue_id,
+			array(
+				'progress' => 30.5,
+				'message'  => sprintf( 'Checking available updates on %s.', $site['site_name'] ),
+			)
+		);
+
+		$result = $this->master_manager->request_site_updates_snapshot( (int) $site['id'] );
+		if ( ! is_wp_error( $result ) ) {
+			$snapshot = isset( $result['snapshot'] ) && is_array( $result['snapshot'] ) ? $result['snapshot'] : array();
+			$themes   = isset( $snapshot['counts']['themes'] ) ? (int) $snapshot['counts']['themes'] : 0;
+			$plugins  = isset( $snapshot['counts']['plugins'] ) ? (int) $snapshot['counts']['plugins'] : 0;
+			$total    = isset( $snapshot['counts']['total'] ) ? (int) $snapshot['counts']['total'] : ( $themes + $plugins );
+			$core     = ! empty( $snapshot['core']['needs_update'] ) ? 'needs update' : 'up to date';
+
+			$this->database->update_queue_item(
+				$queue_id,
+				array(
+					'status'      => 'success',
+					'progress'    => 100.0,
+					'reason_code' => 'check_updates_ok',
+					'message'     => sprintf( 'Update check completed. Core: %s, Themes: %d, Plugins: %d, Total: %d.', $core, $themes, $plugins, $total ),
+					'last_error'  => null,
+					'finished_at' => current_time( 'mysql' ),
+					'worker_id'   => null,
+				)
+			);
+			return;
+		}
+
+		$attempts       = (int) $item['attempts'] + 1;
+		$max_attempts   = max( 1, (int) $item['max_attempts'] );
+		$error_code     = sanitize_key( (string) $result->get_error_code() );
+		$error_message  = $this->humanize_check_error_message( (string) $result->get_error_message() );
+		$transient      = $this->is_transient_check_error( $error_code, $error_message );
+		$should_retry   = $transient && $attempts < $max_attempts;
+		$stored_reason  = '' !== $error_code ? $error_code : 'check_updates_failed';
+
+		if ( $should_retry ) {
+			$delay_seconds = $this->get_retry_delay_seconds( $attempts );
+			$next_run_at   = wp_date( 'Y-m-d H:i:s', time() + $delay_seconds, wp_timezone() );
+
+			$this->database->update_queue_item(
+				$queue_id,
+				array(
+					'status'      => 'on_queue',
+					'progress'    => 0.0,
+					'attempts'    => $attempts,
+					'reason_code' => $stored_reason,
+					'message'     => sprintf( 'Temporary issue while checking updates: %s Retry %d/%d is queued.', $error_message, $attempts + 1, $max_attempts ),
+					'last_error'  => $error_message,
+					'next_run_at' => $next_run_at,
+					'worker_id'   => null,
+				)
+			);
+			return;
+		}
+
+		$this->database->update_queue_item(
+			$queue_id,
+			array(
+				'status'      => 'failed',
+				'progress'    => 100.0,
+				'attempts'    => $attempts,
+				'reason_code' => $stored_reason,
+				'message'     => sprintf( 'Update check failed: %s', $error_message ),
+				'last_error'  => $error_message,
+				'finished_at' => current_time( 'mysql' ),
+				'worker_id'   => null,
+			)
+		);
+	}
+
+	/**
+	 * Detect whether queue row is a check-updates job.
+	 *
+	 * @param array $item Queue row.
+	 * @return bool
+	 */
+	private function is_check_updates_queue_item( array $item ) {
+		return isset( $item['package_id'] ) && (int) $item['package_id'] <= 0;
+	}
+
+	/**
+	 * Return true when check-update failure is transient and worth retrying.
+	 *
+	 * @param string $error_code Error code.
+	 * @param string $message Error message.
+	 * @return bool
+	 */
+	private function is_transient_check_error( $error_code, $message ) {
+		$error_code = sanitize_key( (string) $error_code );
+		if ( in_array( $error_code, array( 'http_request_failed', 'rawatwp_check_failed' ), true ) ) {
+			return true;
+		}
+
+		$message = strtolower( sanitize_text_field( (string) $message ) );
+		if ( '' === $message ) {
+			return false;
+		}
+
+		$markers = array(
+			'timed out',
+			'timeout',
+			'temporarily unavailable',
+			'connection reset',
+			'could not connect',
+			'connection refused',
+			'could not resolve host',
+			'dns',
+		);
+		foreach ( $markers as $marker ) {
+			if ( false !== strpos( $message, $marker ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Convert technical child check errors into a cleaner sentence.
+	 *
+	 * @param string $message Error message.
+	 * @return string
+	 */
+	private function humanize_check_error_message( $message ) {
+		$message = trim( sanitize_text_field( (string) $message ) );
+		if ( '' === $message ) {
+			return 'No response from child site.';
+		}
+
+		if ( false !== stripos( $message, 'critical error on this website' ) ) {
+			return 'Child site returned a runtime error while checking updates.';
+		}
+
+		if ( false !== stripos( $message, 'endpoint is not available' ) || false !== stripos( $message, 'rest_no_route' ) ) {
+			return 'Child site endpoint is unavailable. Update RawatWP on child site first.';
+		}
+
+		return $message;
 	}
 
 	/**
