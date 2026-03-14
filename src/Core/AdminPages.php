@@ -109,6 +109,25 @@ class AdminPages {
 	public function register_menus() {
 		$mode = $this->mode_manager->get_mode();
 
+		if ( 'master' === $mode ) {
+			add_menu_page(
+				'RawatWP',
+				'RawatWP',
+				'manage_options',
+				'rawatwp-overview',
+				array( $this, 'render_overview_page' ),
+				'dashicons-update',
+				58
+			);
+			add_submenu_page( 'rawatwp-overview', 'Overview', 'Overview', 'manage_options', 'rawatwp-overview', array( $this, 'render_overview_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'General', 'General', 'manage_options', 'rawatwp-general', array( $this, 'render_general_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'Sites', 'Sites', 'manage_options', 'rawatwp-sites', array( $this, 'render_sites_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'Packages', 'Packages', 'manage_options', 'rawatwp-packages', array( $this, 'render_packages_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'Deploy', 'Deploy', 'manage_options', 'rawatwp-updates', array( $this, 'render_updates_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'Logs', 'Logs', 'manage_options', 'rawatwp-logs', array( $this, 'render_logs_page' ) );
+			return;
+		}
+
 		add_menu_page(
 			'RawatWP',
 			'RawatWP',
@@ -118,20 +137,11 @@ class AdminPages {
 			'dashicons-update',
 			58
 		);
-
 		add_submenu_page( 'rawatwp-general', 'General', 'General', 'manage_options', 'rawatwp-general', array( $this, 'render_general_page' ) );
-
-		if ( 'master' === $mode ) {
-			add_submenu_page( 'rawatwp-general', 'Sites', 'Sites', 'manage_options', 'rawatwp-sites', array( $this, 'render_sites_page' ) );
-			add_submenu_page( 'rawatwp-general', 'Packages', 'Packages', 'manage_options', 'rawatwp-packages', array( $this, 'render_packages_page' ) );
-			add_submenu_page( 'rawatwp-general', 'Updates', 'Updates', 'manage_options', 'rawatwp-updates', array( $this, 'render_updates_page' ) );
-		}
 
 		if ( 'child' === $mode ) {
 			add_submenu_page( 'rawatwp-general', 'Connection', 'Connection', 'manage_options', 'rawatwp-connection', array( $this, 'render_connection_page' ) );
 		}
-
-		add_submenu_page( 'rawatwp-general', 'Logs', 'Logs', 'manage_options', 'rawatwp-logs', array( $this, 'render_logs_page' ) );
 	}
 
 	/**
@@ -268,6 +278,106 @@ class AdminPages {
 				</form>
 
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render overview page for Master mode.
+	 *
+	 * @return void
+	 */
+	public function render_overview_page() {
+		$this->assert_admin();
+		$mode = $this->mode_manager->get_mode();
+		?>
+		<div class="wrap rawatwp-admin">
+			<h1>RawatWP - Overview</h1>
+			<p class="rawatwp-page-subtitle">One dashboard for check, deploy, and monitor all connected child sites.</p>
+			<?php $this->render_notices(); ?>
+			<?php if ( 'master' !== $mode ) : ?>
+				<div class="rawatwp-card">
+					<p>This page is available only in Master mode.</p>
+				</div>
+			<?php else : ?>
+				<?php
+				$sites               = $this->master_manager->get_sites();
+				$packages            = $this->package_manager->get_packages();
+				$queue_counts        = $this->queue_manager->get_queue_counts();
+				$health_data_by_site = $this->build_sites_health_overview( $sites );
+				$total_sites         = count( $sites );
+				$connected_sites     = 0;
+				$sites_need_update   = 0;
+				$pending_updates     = 0;
+				$failed_checks       = 0;
+
+				foreach ( $sites as $site ) {
+					if ( isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] ) ) {
+						++$connected_sites;
+					}
+
+					$site_id = isset( $site['id'] ) ? (int) $site['id'] : 0;
+					$health  = ( $site_id > 0 && isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ) ? $health_data_by_site[ $site_id ] : array();
+					if ( empty( $health ) ) {
+						continue;
+					}
+
+					$status = isset( $health['status'] ) ? sanitize_key( (string) $health['status'] ) : '';
+					if ( 'failed' === $status ) {
+						++$failed_checks;
+						continue;
+					}
+
+					$total = isset( $health['counts']['total'] ) ? (int) $health['counts']['total'] : 0;
+					if ( $total > 0 ) {
+						++$sites_need_update;
+						$pending_updates += $total;
+					}
+				}
+
+				$queued_now = ( isset( $queue_counts['on_queue'] ) ? (int) $queue_counts['on_queue'] : 0 ) + ( isset( $queue_counts['processing'] ) ? (int) $queue_counts['processing'] : 0 );
+				?>
+				<div class="rawatwp-card">
+					<h2>System Summary</h2>
+					<div class="rawatwp-update-kpis">
+						<div class="rawatwp-update-kpi">
+							<span class="label">Connected Sites</span>
+							<span class="value"><?php echo esc_html( (string) $connected_sites ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Sites Needing Updates</span>
+							<span class="value"><?php echo esc_html( (string) $sites_need_update ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Pending Update Items</span>
+							<span class="value"><?php echo esc_html( (string) $pending_updates ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Queue In Progress</span>
+							<span class="value"><?php echo esc_html( (string) $queued_now ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Uploaded Packages</span>
+							<span class="value"><?php echo esc_html( (string) count( $packages ) ); ?></span>
+						</div>
+						<div class="rawatwp-update-kpi">
+							<span class="label">Check Failures</span>
+							<span class="value"><?php echo esc_html( (string) $failed_checks ); ?></span>
+						</div>
+					</div>
+					<p class="description">Total registered sites: <strong><?php echo esc_html( (string) $total_sites ); ?></strong></p>
+				</div>
+
+				<div class="rawatwp-card">
+					<h2>Quick Actions</h2>
+					<div class="rawatwp-toolbar">
+						<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=rawatwp-sites' ) ); ?>">Manage Sites</a>
+						<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=rawatwp-packages' ) ); ?>">Manage Packages</a>
+						<a class="button button-primary" href="<?php echo esc_url( admin_url( 'admin.php?page=rawatwp-updates#rawatwp-update-health' ) ); ?>">Open Deploy</a>
+						<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=rawatwp-updates#rawatwp-update-progress' ) ); ?>">Open Update Progress</a>
+					</div>
+				</div>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -446,7 +556,6 @@ class AdminPages {
 				$connected_count         = count( $connected_site_ids );
 				$master_version          = $this->get_runtime_rawatwp_version();
 				$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
-				$health_data_by_site     = $this->build_sites_health_overview( $sites );
 				?>
 				<div class="rawatwp-card">
 					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -523,146 +632,13 @@ class AdminPages {
 					</table>
 				</div>
 
-					<div class="rawatwp-card" id="rawatwp-update-health">
-						<div class="rawatwp-card-header">
-							<h2>Update Health Overview</h2>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
-							<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
-							<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
-							<?php submit_button( 'Check All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
-						</form>
+					<div class="rawatwp-card">
+						<h2>Update Monitoring</h2>
+						<p>Update checks and deployment progress are now centralized in Deploy page.</p>
+						<p>
+							<a class="button button-secondary" href="<?php echo esc_url( admin_url( 'admin.php?page=rawatwp-updates#rawatwp-update-health' ) ); ?>">Open Deploy Page</a>
+						</p>
 					</div>
-					<p class="description">Manual trigger only. RawatWP does not run scheduled auto-update checks.</p>
-						<?php if ( $connected_count <= 0 ) : ?>
-							<p>No connected child sites yet.</p>
-						<?php else : ?>
-							<?php
-							$connected_sites = array();
-							foreach ( $sites as $site ) {
-								$is_connected = isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] );
-								if ( ! $is_connected ) {
-									continue;
-								}
-
-								$site_id = (int) $site['id'];
-								$health  = isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ? $health_data_by_site[ $site_id ] : array();
-
-								$status_key   = isset( $health['status'] ) ? sanitize_key( (string) $health['status'] ) : 'unknown';
-								$needs_total  = isset( $health['counts']['total'] ) ? (int) $health['counts']['total'] : 0;
-								$needs_update = ( 'failed' !== $status_key && $needs_total > 0 );
-
-								$site['_rawatwp_health']           = $health;
-								$site['_rawatwp_health_status']    = $status_key;
-								$site['_rawatwp_health_total']     = $needs_total;
-								$site['_rawatwp_has_needs_update'] = $needs_update;
-
-								$connected_sites[] = $site;
-							}
-
-							usort(
-								$connected_sites,
-								function( $a, $b ) {
-									$a_needs  = ! empty( $a['_rawatwp_has_needs_update'] );
-									$b_needs  = ! empty( $b['_rawatwp_has_needs_update'] );
-									$a_failed = isset( $a['_rawatwp_health_status'] ) && 'failed' === $a['_rawatwp_health_status'];
-									$b_failed = isset( $b['_rawatwp_health_status'] ) && 'failed' === $b['_rawatwp_health_status'];
-
-									$a_rank = $a_needs ? 0 : ( $a_failed ? 1 : 2 );
-									$b_rank = $b_needs ? 0 : ( $b_failed ? 1 : 2 );
-									if ( $a_rank !== $b_rank ) {
-										return $a_rank <=> $b_rank;
-									}
-
-									$a_name = isset( $a['site_name'] ) ? sanitize_text_field( (string) $a['site_name'] ) : '';
-									$b_name = isset( $b['site_name'] ) ? sanitize_text_field( (string) $b['site_name'] ) : '';
-
-									return strcasecmp( $a_name, $b_name );
-								}
-							);
-							?>
-							<div class="rawatwp-site-health-list">
-								<?php foreach ( $connected_sites as $site ) : ?>
-									<?php
-									$site_id      = (int) $site['id'];
-									$health       = isset( $site['_rawatwp_health'] ) && is_array( $site['_rawatwp_health'] ) ? $site['_rawatwp_health'] : array();
-									$status_key   = isset( $site['_rawatwp_health_status'] ) ? sanitize_key( (string) $site['_rawatwp_health_status'] ) : '';
-									$needs_total  = isset( $site['_rawatwp_health_total'] ) ? (int) $site['_rawatwp_health_total'] : 0;
-									$needs_update = ! empty( $site['_rawatwp_has_needs_update'] );
-
-									$item_classes = array( 'rawatwp-site-health-item' );
-									if ( $needs_update ) {
-										$item_classes[] = 'is-needs-update';
-									} elseif ( 'failed' === $status_key ) {
-										$item_classes[] = 'is-failed';
-									} else {
-										$item_classes[] = 'is-up-to-date';
-									}
-									?>
-									<div class="<?php echo esc_attr( implode( ' ', $item_classes ) ); ?>">
-										<div class="rawatwp-site-health-head">
-											<div>
-												<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
-										</div>
-									</div>
-								<?php if ( empty( $health ) ) : ?>
-									<p class="rawatwp-site-health-meta">Not checked yet.</p>
-								<?php else : ?>
-									<?php if ( isset( $health['status'] ) && 'failed' === sanitize_key( (string) $health['status'] ) ) : ?>
-										<p class="rawatwp-site-health-meta">
-											<?php
-											echo esc_html(
-												sprintf(
-													'Last check failed on %s.',
-													$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
-												)
-											);
-											?>
-										</p>
-										<p class="rawatwp-site-health-meta">
-											<?php echo esc_html( ! empty( $health['error_message'] ) ? (string) $health['error_message'] : 'Unable to check updates on this child site.' ); ?>
-										</p>
-									<?php else : ?>
-									<p class="rawatwp-site-health-meta">
-										<?php
-										echo esc_html(
-												sprintf(
-													'Core: %s | Themes: %d | Plugins: %d | Last check: %s',
-													! empty( $health['core']['needs_update'] ) ? 'Needs update' : 'Up to date',
-													isset( $health['counts']['themes'] ) ? (int) $health['counts']['themes'] : 0,
-													isset( $health['counts']['plugins'] ) ? (int) $health['counts']['plugins'] : 0,
-													$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
-												)
-										);
-										?>
-									</p>
-										<?php if ( $needs_total > 0 ) : ?>
-											<ul class="rawatwp-site-health-update-list">
-												<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
-													<li><strong>Core:</strong> <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></li>
-												<?php endif; ?>
-
-												<?php if ( ! empty( $health['themes'] ) && is_array( $health['themes'] ) ) : ?>
-													<?php foreach ( $health['themes'] as $theme_item ) : ?>
-														<li><strong>Theme:</strong> <?php echo esc_html( (string) $theme_item['name'] . ' (' . (string) $theme_item['current_version'] . ' -> ' . (string) $theme_item['new_version'] . ')' ); ?></li>
-													<?php endforeach; ?>
-												<?php endif; ?>
-
-												<?php if ( ! empty( $health['plugins'] ) && is_array( $health['plugins'] ) ) : ?>
-													<?php foreach ( $health['plugins'] as $plugin_item ) : ?>
-														<li><strong>Plugin:</strong> <?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
-													<?php endforeach; ?>
-												<?php endif; ?>
-										</ul>
-									<?php else : ?>
-										<p class="rawatwp-site-health-meta">No pending updates found.</p>
-									<?php endif; ?>
-									<?php endif; ?>
-								<?php endif; ?>
-								</div>
-							<?php endforeach; ?>
-						</div>
-					<?php endif; ?>
-				</div>
 
 				<script>
 				(function() {
@@ -1301,8 +1277,8 @@ class AdminPages {
 		$mode = $this->mode_manager->get_mode();
 		?>
 			<div class="wrap rawatwp-admin">
-				<h1>RawatWP - Updates</h1>
-				<p class="rawatwp-page-subtitle">Send updates to child sites with a simple workflow.</p>
+				<h1>RawatWP - Deploy</h1>
+				<p class="rawatwp-page-subtitle">Check updates and deploy packages from one workflow.</p>
 				<?php $this->render_notices(); ?>
 				<?php if ( 'master' !== $mode ) : ?>
 					<div class="rawatwp-card">
@@ -1310,10 +1286,17 @@ class AdminPages {
 					</div>
 				<?php else : ?>
 					<?php
-					$packages          = $this->package_manager->get_packages();
-					$child_sites       = $this->master_manager->get_sites();
-					$health_data_by_site = $this->build_sites_health_overview( $child_sites );
-					$queue_rows        = $this->queue_manager->get_queue_rows( 200 );
+						$packages          = $this->package_manager->get_packages();
+						$child_sites       = $this->master_manager->get_sites();
+						$health_data_by_site = $this->build_sites_health_overview( $child_sites );
+						$connected_site_ids = array();
+						foreach ( $child_sites as $child_site ) {
+							if ( isset( $child_site['connection_status'] ) && 'connected' === sanitize_key( (string) $child_site['connection_status'] ) ) {
+								$connected_site_ids[] = (int) $child_site['id'];
+							}
+						}
+						$connected_count = count( $connected_site_ids );
+						$queue_rows        = $this->queue_manager->get_queue_rows( 200 );
 					$queue_counts      = $this->queue_manager->get_queue_counts();
 					$queue_paused      = $this->queue_manager->is_paused();
 					$runner_token      = $this->security->get_queue_runner_token();
@@ -1345,13 +1328,14 @@ class AdminPages {
 						}
 					}
 					$queue_total_active = $on_queue_count + $processing_count;
-					$status_labels      = array(
-						'on_queue'   => 'On Queue',
-						'processing' => 'Processing',
-						'success'    => 'Success',
-						'failed'     => 'Failed',
-					);
-					?>
+						$status_labels      = array(
+							'on_queue'   => 'On Queue',
+							'processing' => 'Processing',
+							'success'    => 'Success',
+							'failed'     => 'Failed',
+						);
+						$update_button_attributes = $connected_count <= 0 ? array( 'disabled' => 'disabled' ) : array();
+						?>
 					<div class="rawatwp-card">
 						<h2>Quick Summary</h2>
 						<div class="rawatwp-update-kpis">
@@ -1388,10 +1372,12 @@ class AdminPages {
 							</form>
 						</div>
 						<p class="description">Current queue status: <strong><?php echo $queue_paused ? 'Paused' : 'Active'; ?></strong></p>
-					</div>
+						</div>
 
-					<div class="rawatwp-card">
-						<h2>Send Update</h2>
+						<?php $this->render_update_health_overview_card( $child_sites, $connected_count, $update_button_attributes ); ?>
+
+						<div class="rawatwp-card">
+							<h2>Send Update</h2>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_push_update' ); ?>
 						<input type="hidden" name="action" value="rawatwp_push_update" />
@@ -1662,7 +1648,7 @@ class AdminPages {
 			)
 		);
 
-		$redirect_page = 'child' === $mode ? 'rawatwp-connection' : 'rawatwp-general';
+		$redirect_page = 'child' === $mode ? 'rawatwp-connection' : ( 'master' === $mode ? 'rawatwp-overview' : 'rawatwp-general' );
 		$this->redirect_with_notice( $redirect_page, 'Settings saved successfully.', '' );
 	}
 
@@ -1854,7 +1840,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_check_site_updates' );
 
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-sites', '', 'This feature is available only in Master mode.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'This feature is available only in Master mode.' );
 		}
 
 		$site_id = isset( $_POST['site_id'] ) ? (int) $_POST['site_id'] : 0;
@@ -1866,7 +1852,7 @@ class AdminPages {
 		if ( is_wp_error( $result ) ) {
 			$url = add_query_arg(
 				array(
-					'page' => 'rawatwp-sites',
+					'page' => 'rawatwp-updates',
 				),
 				admin_url( 'admin.php' )
 			) . '#rawatwp-update-health';
@@ -1891,7 +1877,7 @@ class AdminPages {
 
 		$url = add_query_arg(
 			array(
-				'page' => 'rawatwp-sites',
+				'page' => 'rawatwp-updates',
 			),
 			admin_url( 'admin.php' )
 		) . '#rawatwp-update-health';
@@ -1908,7 +1894,7 @@ class AdminPages {
 		$this->assert_admin_post( 'rawatwp_check_all_site_updates' );
 
 		if ( 'master' !== $this->mode_manager->get_mode() ) {
-			$this->redirect_with_notice( 'rawatwp-sites', '', 'This feature is available only in Master mode.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'This feature is available only in Master mode.' );
 		}
 
 		$sites    = $this->master_manager->get_sites();
@@ -1920,12 +1906,12 @@ class AdminPages {
 		}
 
 		if ( empty( $site_ids ) ) {
-			$this->redirect_with_notice( 'rawatwp-sites', '', 'No connected child sites found.' );
+			$this->redirect_with_notice( 'rawatwp-updates', '', 'No connected child sites found.' );
 		}
 
 		$result = $this->queue_manager->enqueue_update_check_batch( $site_ids );
 		if ( is_wp_error( $result ) ) {
-			$this->redirect_with_notice( 'rawatwp-sites', '', $result->get_error_message() );
+			$this->redirect_with_notice( 'rawatwp-updates', '', $result->get_error_message() );
 		}
 
 		$queued  = isset( $result['queued'] ) ? (int) $result['queued'] : 0;
@@ -2624,6 +2610,169 @@ class AdminPages {
 		}
 
 		return ucwords( str_replace( '_', ' ', $mode ) );
+	}
+
+	/**
+	 * Build sorted connected-site list with health state metadata.
+	 *
+	 * @param array $sites Site rows.
+	 * @param array $health_data_by_site Health map by site ID.
+	 * @return array
+	 */
+	private function build_connected_sites_for_health_overview( array $sites, array $health_data_by_site ) {
+		$connected_sites = array();
+
+		foreach ( $sites as $site ) {
+			$is_connected = isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] );
+			if ( ! $is_connected ) {
+				continue;
+			}
+
+			$site_id = isset( $site['id'] ) ? (int) $site['id'] : 0;
+			$health  = ( $site_id > 0 && isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ) ? $health_data_by_site[ $site_id ] : array();
+
+			$status_key   = isset( $health['status'] ) ? sanitize_key( (string) $health['status'] ) : 'unknown';
+			$needs_total  = isset( $health['counts']['total'] ) ? (int) $health['counts']['total'] : 0;
+			$needs_update = ( 'failed' !== $status_key && $needs_total > 0 );
+
+			$site['_rawatwp_health']           = $health;
+			$site['_rawatwp_health_status']    = $status_key;
+			$site['_rawatwp_health_total']     = $needs_total;
+			$site['_rawatwp_has_needs_update'] = $needs_update;
+
+			$connected_sites[] = $site;
+		}
+
+		usort(
+			$connected_sites,
+			function( $a, $b ) {
+				$a_needs  = ! empty( $a['_rawatwp_has_needs_update'] );
+				$b_needs  = ! empty( $b['_rawatwp_has_needs_update'] );
+				$a_failed = isset( $a['_rawatwp_health_status'] ) && 'failed' === $a['_rawatwp_health_status'];
+				$b_failed = isset( $b['_rawatwp_health_status'] ) && 'failed' === $b['_rawatwp_health_status'];
+
+				$a_rank = $a_needs ? 0 : ( $a_failed ? 1 : 2 );
+				$b_rank = $b_needs ? 0 : ( $b_failed ? 1 : 2 );
+				if ( $a_rank !== $b_rank ) {
+					return $a_rank <=> $b_rank;
+				}
+
+				$a_name = isset( $a['site_name'] ) ? sanitize_text_field( (string) $a['site_name'] ) : '';
+				$b_name = isset( $b['site_name'] ) ? sanitize_text_field( (string) $b['site_name'] ) : '';
+
+				return strcasecmp( $a_name, $b_name );
+			}
+		);
+
+		return $connected_sites;
+	}
+
+	/**
+	 * Render update health overview card.
+	 *
+	 * @param array $sites Site rows.
+	 * @param int   $connected_count Connected site count.
+	 * @param array $update_button_attributes Button attributes.
+	 * @return void
+	 */
+	private function render_update_health_overview_card( array $sites, $connected_count, array $update_button_attributes ) {
+		$health_data_by_site = $this->build_sites_health_overview( $sites );
+		$connected_sites     = $this->build_connected_sites_for_health_overview( $sites, $health_data_by_site );
+		?>
+		<div class="rawatwp-card" id="rawatwp-update-health">
+			<div class="rawatwp-card-header">
+				<h2>Update Health Overview</h2>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
+					<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
+					<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
+					<?php submit_button( 'Check All Connected Sites', 'secondary', 'submit', false, $update_button_attributes ); ?>
+				</form>
+			</div>
+			<p class="description">Manual trigger only. RawatWP does not run scheduled auto-update checks.</p>
+			<?php if ( (int) $connected_count <= 0 ) : ?>
+				<p>No connected child sites yet.</p>
+			<?php else : ?>
+				<div class="rawatwp-site-health-list">
+					<?php foreach ( $connected_sites as $site ) : ?>
+						<?php
+						$health       = isset( $site['_rawatwp_health'] ) && is_array( $site['_rawatwp_health'] ) ? $site['_rawatwp_health'] : array();
+						$status_key   = isset( $site['_rawatwp_health_status'] ) ? sanitize_key( (string) $site['_rawatwp_health_status'] ) : '';
+						$needs_total  = isset( $site['_rawatwp_health_total'] ) ? (int) $site['_rawatwp_health_total'] : 0;
+						$needs_update = ! empty( $site['_rawatwp_has_needs_update'] );
+
+						$item_classes = array( 'rawatwp-site-health-item' );
+						if ( $needs_update ) {
+							$item_classes[] = 'is-needs-update';
+						} elseif ( 'failed' === $status_key ) {
+							$item_classes[] = 'is-failed';
+						} else {
+							$item_classes[] = 'is-up-to-date';
+						}
+						?>
+						<div class="<?php echo esc_attr( implode( ' ', $item_classes ) ); ?>">
+							<div class="rawatwp-site-health-head">
+								<div>
+									<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
+								</div>
+							</div>
+							<?php if ( empty( $health ) ) : ?>
+								<p class="rawatwp-site-health-meta">Not checked yet.</p>
+							<?php else : ?>
+								<?php if ( isset( $health['status'] ) && 'failed' === sanitize_key( (string) $health['status'] ) ) : ?>
+									<p class="rawatwp-site-health-meta">
+										<?php
+										echo esc_html(
+											sprintf(
+												'Last check failed on %s.',
+												$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
+											)
+										);
+										?>
+									</p>
+									<p class="rawatwp-site-health-meta">
+										<?php echo esc_html( ! empty( $health['error_message'] ) ? (string) $health['error_message'] : 'Unable to check updates on this child site.' ); ?>
+									</p>
+								<?php else : ?>
+									<p class="rawatwp-site-health-meta">
+										<?php
+										echo esc_html(
+											sprintf(
+												'Core: %s | Themes: %d | Plugins: %d | Last check: %s',
+												! empty( $health['core']['needs_update'] ) ? 'Needs update' : 'Up to date',
+												isset( $health['counts']['themes'] ) ? (int) $health['counts']['themes'] : 0,
+												isset( $health['counts']['plugins'] ) ? (int) $health['counts']['plugins'] : 0,
+												$this->format_datetime_for_display( isset( $health['checked_at'] ) ? (string) $health['checked_at'] : '' )
+											)
+										);
+										?>
+									</p>
+									<?php if ( $needs_total > 0 ) : ?>
+										<ul class="rawatwp-site-health-update-list">
+											<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
+												<li><strong>Core:</strong> <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></li>
+											<?php endif; ?>
+											<?php if ( ! empty( $health['themes'] ) && is_array( $health['themes'] ) ) : ?>
+												<?php foreach ( $health['themes'] as $theme_item ) : ?>
+													<li><strong>Theme:</strong> <?php echo esc_html( (string) $theme_item['name'] . ' (' . (string) $theme_item['current_version'] . ' -> ' . (string) $theme_item['new_version'] . ')' ); ?></li>
+												<?php endforeach; ?>
+											<?php endif; ?>
+											<?php if ( ! empty( $health['plugins'] ) && is_array( $health['plugins'] ) ) : ?>
+												<?php foreach ( $health['plugins'] as $plugin_item ) : ?>
+													<li><strong>Plugin:</strong> <?php echo esc_html( (string) $plugin_item['name'] . ' (' . (string) $plugin_item['current_version'] . ' -> ' . (string) $plugin_item['new_version'] . ')' ); ?></li>
+												<?php endforeach; ?>
+											<?php endif; ?>
+										</ul>
+									<?php else : ?>
+										<p class="rawatwp-site-health-meta">No pending updates found.</p>
+									<?php endif; ?>
+								<?php endif; ?>
+							<?php endif; ?>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
+		</div>
+		<?php
 	}
 
 	/**
