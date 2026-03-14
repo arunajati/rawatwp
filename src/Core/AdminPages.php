@@ -1684,6 +1684,9 @@ class AdminPages {
 							document.body.classList.remove('rawatwp-modal-open');
 						}
 
+						// Safety: ensure modal is closed on first page render.
+						closeDeployModal();
+
 						openDeployButtons.forEach(function(button) {
 							button.addEventListener('click', function() {
 								var siteId = button.getAttribute('data-site-id') || '';
@@ -1695,6 +1698,16 @@ class AdminPages {
 							button.addEventListener('click', function() {
 								closeDeployModal();
 							});
+						});
+
+						document.addEventListener('keydown', function(event) {
+							if ('Escape' !== event.key) {
+								return;
+							}
+							if (!deployModal || deployModal.hidden) {
+								return;
+							}
+							closeDeployModal();
 						});
 
 						if (deployForm) {

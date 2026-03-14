@@ -618,6 +618,10 @@ body.rawatwp-modal-open {
 	padding: 20px;
 }
 
+.rawatwp-admin .rawatwp-modal[hidden] {
+	display: none !important;
+}
+
 .rawatwp-admin .rawatwp-modal-backdrop {
 	position: absolute;
 	inset: 0;
