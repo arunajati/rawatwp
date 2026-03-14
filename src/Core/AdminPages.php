@@ -1424,7 +1424,23 @@ class AdminPages {
 							$needs_update_site++;
 						}
 					}
-					$queue_total_active = $on_queue_count + $processing_count;
+						$queue_total_active = $on_queue_count + $processing_count;
+						$processing_candidate = null;
+						$queued_candidate     = null;
+						foreach ( $queue_rows as $queue_row_candidate ) {
+							$candidate_status = isset( $queue_row_candidate['status'] ) ? sanitize_key( (string) $queue_row_candidate['status'] ) : '';
+							if ( 'processing' === $candidate_status && null === $processing_candidate ) {
+								$processing_candidate = $queue_row_candidate;
+							}
+							if ( 'on_queue' === $candidate_status ) {
+								if ( null === $queued_candidate || (int) $queue_row_candidate['id'] < (int) $queued_candidate['id'] ) {
+									$queued_candidate = $queue_row_candidate;
+								}
+							}
+						}
+						$pending_overlay_row       = is_array( $processing_candidate ) ? $processing_candidate : $queued_candidate;
+						$pending_overlay_site_name = is_array( $pending_overlay_row ) && isset( $pending_overlay_row['site_name'] ) ? sanitize_text_field( (string) $pending_overlay_row['site_name'] ) : '';
+						$pending_overlay_item      = is_array( $pending_overlay_row ) && isset( $pending_overlay_row['item_label'] ) ? sanitize_text_field( (string) $pending_overlay_row['item_label'] ) : '';
 						$status_labels      = array(
 							'on_queue'   => 'On Queue',
 							'processing' => 'Processing',
@@ -1552,23 +1568,6 @@ class AdminPages {
 							</form>
 						</div>
 						<p class="rawatwp-progress-warning"><strong>Important:</strong> Do not close this page while update queue is processing.</p>
-						<div id="rawatwp-queue-live-runner" class="rawatwp-queue-live-runner" hidden>
-							<div class="rawatwp-queue-live-head">
-								<span class="rawatwp-queue-live-spinner" aria-hidden="true"></span>
-								<strong>Background Queue Running</strong>
-							</div>
-							<p id="rawatwp-queue-live-summary" class="rawatwp-queue-live-summary"></p>
-							<div class="rawatwp-queue-live-columns">
-								<div>
-									<strong>Currently Processing</strong>
-									<ul id="rawatwp-queue-live-processing-list" class="rawatwp-queue-live-list"></ul>
-								</div>
-								<div>
-									<strong>Next in Queue</strong>
-									<ul id="rawatwp-queue-live-queued-list" class="rawatwp-queue-live-list"></ul>
-								</div>
-							</div>
-						</div>
 						<p class="description">Auto-clean is active: completed progress rows older than 30 days are removed, and total completed rows are capped at 10,000.</p>
 						<table class="widefat striped">
 						<thead>
@@ -1598,22 +1597,22 @@ class AdminPages {
 										$detail_text = '' !== (string) $row['message'] ? (string) $row['message'] : ( isset( $row['reason_code'] ) ? (string) $row['reason_code'] : '' );
 									}
 									?>
-									<tr data-queue-id="<?php echo esc_attr( (string) $row['id'] ); ?>">
+									<tr>
 										<td><?php echo esc_html( $row['site_name'] . ( '' !== $row['site_url'] ? ' (' . $row['site_url'] . ')' : '' ) ); ?></td>
 										<td><?php echo esc_html( $row['item_label'] . ( '' !== $row['item_type'] ? ' [' . $row['item_type'] . ':' . $row['item_slug'] . ']' : '' ) ); ?></td>
-										<td class="rawatwp-queue-status-cell">
+										<td>
 											<span class="rawatwp-status-badge rawatwp-status-<?php echo esc_attr( $status_key ); ?>"><?php echo esc_html( $status_label ); ?></span>
 											<?php if ( '' !== $detail_text ) : ?>
-												<div class="description rawatwp-queue-status-message"><?php echo esc_html( $detail_text ); ?></div>
+												<div class="description"><?php echo esc_html( $detail_text ); ?></div>
 											<?php endif; ?>
 										</td>
 											<td class="rawatwp-progress-cell">
 											<div class="rawatwp-progress-wrap">
 												<div class="rawatwp-progress-bar" style="width:<?php echo esc_attr( $progress_txt ); ?>%;"></div>
 											</div>
-											<span class="rawatwp-progress-text"><?php echo esc_html( $progress_txt ); ?>%</span>
+											<?php echo esc_html( $progress_txt ); ?>%
 										</td>
-										<td class="rawatwp-queue-updated-cell"><?php echo esc_html( $this->format_datetime_for_display( isset( $row['updated_at'] ) ? $row['updated_at'] : '' ) ); ?></td>
+										<td><?php echo esc_html( $this->format_datetime_for_display( isset( $row['updated_at'] ) ? $row['updated_at'] : '' ) ); ?></td>
 									</tr>
 								<?php endforeach; ?>
 							<?php endif; ?>
@@ -1646,6 +1645,8 @@ class AdminPages {
 
 						var hasPending = <?php echo (int) ( $has_pending ? 1 : 0 ); ?>;
 						var paused = <?php echo (int) ( $queue_paused ? 1 : 0 ); ?>;
+						var pendingSiteName = <?php echo wp_json_encode( $pending_overlay_site_name ); ?>;
+						var pendingItemLabel = <?php echo wp_json_encode( $pending_overlay_item ); ?>;
 						var ajaxNonce = <?php echo wp_json_encode( $ajax_nonce ); ?>;
 						var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 						var browserWorkerCheckbox = document.getElementById('rawatwp-browser-worker-enable');
@@ -1653,22 +1654,11 @@ class AdminPages {
 						var openDeployButtons = document.querySelectorAll('.rawatwp-open-deploy-modal');
 						var closeDeployButtons = document.querySelectorAll('.rawatwp-modal-close[data-close="1"]');
 						var deployForm = document.getElementById('rawatwp-deploy-modal-form');
-						var liveRunner = document.getElementById('rawatwp-queue-live-runner');
-						var liveSummary = document.getElementById('rawatwp-queue-live-summary');
-						var liveProcessingList = document.getElementById('rawatwp-queue-live-processing-list');
-						var liveQueuedList = document.getElementById('rawatwp-queue-live-queued-list');
 						var selectAllSites = document.getElementById('rawatwp-select-all-sites');
 						var selectAllPackages = document.getElementById('rawatwp-select-all-packages');
 						var siteChecks = document.querySelectorAll('.rawatwp-site-check');
 						var packageChecks = document.querySelectorAll('.rawatwp-package-check');
 						var workerBusy = false;
-						var statusPollingTimer = null;
-						var statusLabelMap = {
-							on_queue: 'On Queue',
-							processing: 'Processing',
-							success: 'Success',
-							failed: 'Failed'
-						};
 
 						if (selectAllSites) {
 							selectAllSites.addEventListener('change', function() {
@@ -1770,146 +1760,16 @@ class AdminPages {
 							});
 						}
 
-						function getQueuePending(counts) {
-							var onQueue = counts && counts.on_queue ? Number(counts.on_queue) : 0;
-							var processing = counts && counts.processing ? Number(counts.processing) : 0;
-							return Math.max(0, onQueue + processing);
-						}
-
-						function makeLiveItemText(item) {
-							var siteName = item && item.site_name ? String(item.site_name) : 'Child site';
-							var itemLabel = item && item.item_label ? String(item.item_label) : 'Update task';
-							var progress = item && item.progress ? Number(item.progress) : 0;
-							var message = item && item.message ? String(item.message) : '';
-							var progressText = progress.toFixed(2) + '%';
-							return siteName + ' - ' + itemLabel + ' (' + progressText + ')' + (message ? ' - ' + message : '');
-						}
-
-						function renderLiveList(targetNode, items, emptyMessage) {
-							if (!targetNode) {
-								return;
+						function currentOverlayMessage() {
+							var siteLabel = pendingSiteName ? String(pendingSiteName) : '';
+							var itemLabel = pendingItemLabel ? String(pendingItemLabel).toLowerCase() : '';
+							if (!siteLabel) {
+								return 'Processing update queue...';
 							}
-							targetNode.innerHTML = '';
-							if (!items || !items.length) {
-								var emptyItem = document.createElement('li');
-								emptyItem.className = 'rawatwp-queue-live-empty';
-								emptyItem.textContent = emptyMessage;
-								targetNode.appendChild(emptyItem);
-								return;
+							if (itemLabel.indexOf('check updates') !== -1) {
+								return 'Now checking ' + siteLabel + '...';
 							}
-							items.forEach(function(item) {
-								var li = document.createElement('li');
-								li.textContent = makeLiveItemText(item);
-								targetNode.appendChild(li);
-							});
-						}
-
-						function updateProgressRow(item) {
-							if (!item || !item.id) {
-								return;
-							}
-							var row = document.querySelector('tr[data-queue-id="' + String(item.id) + '"]');
-							if (!row) {
-								return;
-							}
-
-							var statusCell = row.querySelector('.rawatwp-queue-status-cell');
-							var badge = statusCell ? statusCell.querySelector('.rawatwp-status-badge') : null;
-							var statusKey = item.status ? String(item.status) : '';
-							var statusText = statusLabelMap[statusKey] || statusKey;
-							if (badge) {
-								badge.className = 'rawatwp-status-badge rawatwp-status-' + statusKey;
-								badge.textContent = statusText;
-							}
-
-							var progress = item.progress ? Number(item.progress) : 0;
-							var progressText = progress.toFixed(2) + '%';
-							var progressBar = row.querySelector('.rawatwp-progress-bar');
-							var progressValue = row.querySelector('.rawatwp-progress-text');
-							if (progressBar) {
-								progressBar.style.width = progressText;
-							}
-							if (progressValue) {
-								progressValue.textContent = progressText;
-							}
-
-							var updatedCell = row.querySelector('.rawatwp-queue-updated-cell');
-							if (updatedCell && item.updated_at) {
-								updatedCell.textContent = String(item.updated_at);
-							}
-						}
-
-						function renderLiveRunner(data) {
-							var counts = data && data.counts ? data.counts : {};
-							var live = data && data.live ? data.live : {};
-							var processingItems = Array.isArray(live.processing) ? live.processing : [];
-							var queuedItems = Array.isArray(live.queued) ? live.queued : [];
-							var pending = getQueuePending(counts);
-
-							hasPending = pending > 0;
-							paused = !!(data && data.paused);
-
-							if (!liveRunner || !liveSummary || !liveProcessingList || !liveQueuedList) {
-								return;
-							}
-
-							if (!hasPending) {
-								liveRunner.hidden = true;
-								return;
-							}
-
-							liveRunner.hidden = false;
-							if (paused) {
-								liveSummary.textContent = 'Queue is paused. Remaining tasks: ' + pending + '.';
-							} else {
-								liveSummary.textContent = 'Queue is running in background. On queue: ' + (counts.on_queue || 0) + ', Processing: ' + (counts.processing || 0) + '.';
-							}
-
-							renderLiveList(liveProcessingList, processingItems, paused ? 'Queue is paused.' : 'Waiting for worker to pick next task...');
-							renderLiveList(liveQueuedList, queuedItems, 'No queued task preview.');
-
-							processingItems.forEach(updateProgressRow);
-							queuedItems.forEach(updateProgressRow);
-						}
-
-						function scheduleStatusPolling(delay) {
-							if (statusPollingTimer) {
-								clearTimeout(statusPollingTimer);
-							}
-							statusPollingTimer = setTimeout(pollQueueStatus, delay);
-						}
-
-						function pollQueueStatus() {
-							var formData = new FormData();
-							formData.append('action', 'rawatwp_queue_status');
-							formData.append('_ajax_nonce', ajaxNonce);
-
-							fetch(ajaxUrl, {
-								method: 'POST',
-								credentials: 'same-origin',
-								body: formData
-							})
-							.then(function(response) {
-								return response.json();
-							})
-							.then(function(payload) {
-								if (!payload || !payload.success) {
-									scheduleStatusPolling(4000);
-									return;
-								}
-								renderLiveRunner(payload.data || {});
-								if (!paused && hasPending && browserWorkerCheckbox && browserWorkerCheckbox.checked) {
-									runBrowserWorkerStep();
-								}
-								if (hasPending) {
-									scheduleStatusPolling(2800);
-								}
-							})
-							.catch(function() {
-								if (hasPending) {
-									scheduleStatusPolling(5000);
-								}
-							});
+							return 'Now processing ' + siteLabel + '...';
 						}
 
 						function runBrowserWorkerStep() {
@@ -1931,31 +1791,32 @@ class AdminPages {
 								body: formData
 							})
 							.then(function() {
-								scheduleStatusPolling(700);
+								setTimeout(function() {
+									window.location.reload();
+								}, 900);
 							})
 							.catch(function() {
 								workerBusy = false;
+								window.dispatchEvent(new CustomEvent('rawatwp:loading', {
+									detail: { show: false }
+								}));
 							})
 							.finally(function() {
 								workerBusy = false;
 							});
 						}
 
-						if (hasPending) {
-							renderLiveRunner({
-								counts: {
-									on_queue: <?php echo (int) $on_queue_count; ?>,
-									processing: <?php echo (int) $processing_count; ?>,
-									success: <?php echo (int) $success_count; ?>,
-									failed: <?php echo (int) $failed_count; ?>
-								},
-								paused: paused,
-								live: {
-									processing: [],
-									queued: []
+						if (hasPending && !paused) {
+							window.dispatchEvent(new CustomEvent('rawatwp:loading', {
+								detail: {
+									show: true,
+									message: currentOverlayMessage()
 								}
-							});
-							scheduleStatusPolling(600);
+							}));
+							setTimeout(runBrowserWorkerStep, 500);
+							setTimeout(function() {
+								window.location.reload();
+							}, 12000);
 						}
 					})();
 					</script>
@@ -2806,51 +2667,10 @@ class AdminPages {
 			wp_send_json_error( array( 'message' => 'Queue feature is available only in Master mode.' ), 403 );
 		}
 
-		$counts          = $this->queue_manager->get_queue_counts();
-		$rows            = $this->queue_manager->get_queue_rows( 120 );
-		$processing_rows = array();
-		$queued_rows     = array();
-		foreach ( $rows as $row ) {
-			$status = isset( $row['status'] ) ? sanitize_key( (string) $row['status'] ) : '';
-			if ( 'processing' !== $status && 'on_queue' !== $status ) {
-				continue;
-			}
-
-			$item = array(
-				'id'         => isset( $row['id'] ) ? (int) $row['id'] : 0,
-				'site_name'  => isset( $row['site_name'] ) ? sanitize_text_field( (string) $row['site_name'] ) : 'Child site',
-				'site_url'   => isset( $row['site_url'] ) ? esc_url_raw( (string) $row['site_url'] ) : '',
-				'item_label' => isset( $row['item_label'] ) ? sanitize_text_field( (string) $row['item_label'] ) : 'Update task',
-				'status'     => $status,
-				'progress'   => isset( $row['progress'] ) ? max( 0, min( 100, (float) $row['progress'] ) ) : 0.0,
-				'message'    => isset( $row['message'] ) ? sanitize_text_field( (string) $row['message'] ) : '',
-				'updated_at' => $this->format_datetime_for_display( isset( $row['updated_at'] ) ? (string) $row['updated_at'] : '' ),
-			);
-
-			if ( 'processing' === $status ) {
-				if ( count( $processing_rows ) < 5 ) {
-					$processing_rows[] = $item;
-				}
-			} else {
-				if ( count( $queued_rows ) < 5 ) {
-					$queued_rows[] = $item;
-				}
-			}
-
-			if ( count( $processing_rows ) >= 5 && count( $queued_rows ) >= 5 ) {
-				break;
-			}
-		}
-
 		wp_send_json_success(
 			array(
-				'counts' => $counts,
+				'counts' => $this->queue_manager->get_queue_counts(),
 				'paused' => $this->queue_manager->is_paused(),
-				'live'   => array(
-					'pending'    => ( (int) $counts['on_queue'] + (int) $counts['processing'] ) > 0,
-					'processing' => $processing_rows,
-					'queued'     => $queued_rows,
-				),
 			)
 		);
 	}
