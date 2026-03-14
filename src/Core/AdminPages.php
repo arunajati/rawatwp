@@ -129,7 +129,6 @@ class AdminPages {
 
 		if ( 'child' === $mode ) {
 			add_submenu_page( 'rawatwp-general', 'Connection', 'Connection', 'manage_options', 'rawatwp-connection', array( $this, 'render_connection_page' ) );
-			add_submenu_page( 'rawatwp-general', 'Monitored Items', 'Monitored Items', 'manage_options', 'rawatwp-monitored-items', array( $this, 'render_monitored_items_page' ) );
 		}
 
 		add_submenu_page( 'rawatwp-general', 'Logs', 'Logs', 'manage_options', 'rawatwp-logs', array( $this, 'render_logs_page' ) );
@@ -172,11 +171,6 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_save_general_settings', array( $this, 'handle_save_general_settings' ) );
 		add_action( 'admin_post_rawatwp_save_and_connect', array( $this, 'handle_save_and_connect' ) );
 		add_action( 'admin_post_rawatwp_disconnect_child', array( $this, 'handle_disconnect_child' ) );
-		add_action( 'admin_post_rawatwp_add_item', array( $this, 'handle_add_monitored_item' ) );
-		add_action( 'admin_post_rawatwp_toggle_item', array( $this, 'handle_toggle_monitored_item' ) );
-		add_action( 'admin_post_rawatwp_delete_item', array( $this, 'handle_delete_monitored_item' ) );
-		add_action( 'admin_post_rawatwp_scan_now', array( $this, 'handle_scan_now' ) );
-		add_action( 'admin_post_rawatwp_scan_installed_items', array( $this, 'handle_scan_installed_items' ) );
 		add_action( 'admin_post_rawatwp_add_site', array( $this, 'handle_add_site' ) );
 		add_action( 'admin_post_rawatwp_regen_key', array( $this, 'handle_regenerate_site_key' ) );
 		add_action( 'admin_post_rawatwp_check_site_updates', array( $this, 'handle_check_site_updates' ) );
@@ -289,7 +283,7 @@ class AdminPages {
 		?>
 		<div class="wrap rawatwp-admin">
 			<h1>RawatWP - Connection</h1>
-			<p class="rawatwp-page-subtitle">Connect this Child site to Master.</p>
+			<p class="rawatwp-page-subtitle">Connect this Child site to Master. All monitoring and update control are handled from Master.</p>
 			<?php $this->render_notices(); ?>
 			<?php if ( 'child' !== $mode ) : ?>
 				<div class="rawatwp-card">
@@ -1265,8 +1259,8 @@ class AdminPages {
 				<?php else : ?>
 					<?php
 					$packages          = $this->package_manager->get_packages();
-					$site_summaries    = $this->master_manager->get_sites_update_summary();
 					$child_sites       = $this->master_manager->get_sites();
+					$health_data_by_site = $this->build_sites_health_overview( $child_sites );
 					$queue_rows        = $this->queue_manager->get_queue_rows( 200 );
 					$queue_counts      = $this->queue_manager->get_queue_counts();
 					$queue_paused      = $this->queue_manager->is_paused();
@@ -1286,9 +1280,11 @@ class AdminPages {
 					$failed_count      = isset( $queue_counts['failed'] ) ? (int) $queue_counts['failed'] : 0;
 					$needs_update_site = 0;
 					$needs_by_url      = array();
-					foreach ( $site_summaries as $summary ) {
-						$url         = isset( $summary['site_url'] ) ? (string) $summary['site_url'] : '';
-						$needs_count = ! empty( $summary['needs_update_items'] ) && is_array( $summary['needs_update_items'] ) ? count( $summary['needs_update_items'] ) : 0;
+					foreach ( $child_sites as $site_summary ) {
+						$url         = isset( $site_summary['site_url'] ) ? (string) $site_summary['site_url'] : '';
+						$site_id     = isset( $site_summary['id'] ) ? (int) $site_summary['id'] : 0;
+						$site_health = ( $site_id > 0 && isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ) ? $health_data_by_site[ $site_id ] : array();
+						$needs_count = ( isset( $site_health['counts']['total'] ) && 'failed' !== ( isset( $site_health['status'] ) ? sanitize_key( (string) $site_health['status'] ) : 'success' ) ) ? (int) $site_health['counts']['total'] : 0;
 						if ( $needs_count > 0 ) {
 							$needs_update_site++;
 						}
