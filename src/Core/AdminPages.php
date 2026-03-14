@@ -121,12 +121,12 @@ class AdminPages {
 			);
 			add_submenu_page( 'rawatwp-overview', 'Overview', 'Overview', 'manage_options', 'rawatwp-overview', array( $this, 'render_overview_page' ) );
 			add_submenu_page( 'rawatwp-overview', 'General', 'General', 'manage_options', 'rawatwp-general', array( $this, 'render_general_page' ) );
+			add_submenu_page( 'rawatwp-overview', 'Packages', 'Packages', 'manage_options', 'rawatwp-packages', array( $this, 'render_packages_page' ) );
 			add_submenu_page( 'rawatwp-overview', 'Check & Deploy', 'Check & Deploy', 'manage_options', 'rawatwp-updates', array( $this, 'render_updates_page' ) );
 			add_submenu_page( 'rawatwp-overview', 'Logs', 'Logs', 'manage_options', 'rawatwp-logs', array( $this, 'render_logs_page' ) );
 
 			// Hidden compatibility pages for direct links/redirects.
 			add_submenu_page( null, 'Sites', 'Sites', 'manage_options', 'rawatwp-sites', array( $this, 'render_sites_page' ) );
-			add_submenu_page( null, 'Packages', 'Packages', 'manage_options', 'rawatwp-packages', array( $this, 'render_packages_page' ) );
 			return;
 		}
 
