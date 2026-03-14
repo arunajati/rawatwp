@@ -522,6 +522,7 @@ class ChildManager {
 		$snapshot      = $this->collect_wp_updates_snapshot( $force_refresh );
 
 		if ( is_wp_error( $snapshot ) ) {
+			$detail = sanitize_text_field( $snapshot->get_error_message() );
 			$this->logger->log(
 				array(
 					'mode'     => 'child',
@@ -530,12 +531,12 @@ class ChildManager {
 					'status'   => 'failed',
 					'message'  => 'Manual update check failed on child site.',
 					'context'  => array(
-						'detail' => $snapshot->get_error_message(),
+						'detail' => $detail,
 					),
 				)
 			);
 
-			return new \WP_Error( 'rawatwp_child_check_failed', 'Failed to check available updates on child site.', array( 'http_status' => 500 ) );
+			return new \WP_Error( 'rawatwp_child_check_failed', '' !== $detail ? $detail : 'Failed to check available updates on child site.', array( 'http_status' => 500 ) );
 		}
 
 		$this->logger->log(
@@ -589,43 +590,26 @@ class ChildManager {
 		if ( ! function_exists( 'get_plugins' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
-		if ( ! function_exists( 'set_current_screen' ) && file_exists( ABSPATH . 'wp-admin/includes/screen.php' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/screen.php';
-		}
 
-		$had_current_screen = array_key_exists( 'current_screen', $GLOBALS );
-		$previous_screen    = $had_current_screen ? $GLOBALS['current_screen'] : null;
+		$warnings = array();
 
-		try {
-			if ( function_exists( 'set_current_screen' ) ) {
-				set_current_screen( 'dashboard' );
-			}
-
-			if ( $force_refresh ) {
-				if ( function_exists( 'wp_clean_update_cache' ) ) {
+		if ( $force_refresh ) {
+			if ( function_exists( 'wp_clean_update_cache' ) ) {
+				try {
 					wp_clean_update_cache();
+				} catch ( \Throwable $runtime_error ) {
+					$warnings[] = 'Cache refresh warning: ' . sanitize_text_field( $runtime_error->getMessage() );
 				}
-				delete_site_transient( 'update_core' );
-				delete_site_transient( 'update_plugins' );
-				delete_site_transient( 'update_themes' );
 			}
 
-			// Use no-argument calls for broad WordPress/PHP compatibility.
-			wp_version_check();
-			wp_update_plugins();
-			wp_update_themes();
-		} catch ( \Throwable $runtime_error ) {
-			return new \WP_Error(
-				'rawatwp_check_runtime_error',
-				sprintf( 'Update check runtime error: %s', sanitize_text_field( $runtime_error->getMessage() ) )
-			);
-		} finally {
-			if ( $had_current_screen ) {
-				$GLOBALS['current_screen'] = $previous_screen;
-			} else {
-				unset( $GLOBALS['current_screen'] );
-			}
+			delete_site_transient( 'update_core' );
+			delete_site_transient( 'update_plugins' );
+			delete_site_transient( 'update_themes' );
 		}
+
+		$this->run_update_callback_safely( 'wp_version_check', $warnings );
+		$this->run_update_callback_safely( 'wp_update_plugins', $warnings );
+		$this->run_update_callback_safely( 'wp_update_themes', $warnings );
 
 		$current_wp_version = sanitize_text_field( (string) get_bloginfo( 'version' ) );
 		$core_updates       = function_exists( 'get_core_updates' ) ? get_core_updates( array( 'dismissed' => false ) ) : array();
@@ -735,6 +719,7 @@ class ChildManager {
 
 		return array(
 			'checked_at' => current_time( 'mysql' ),
+			'warnings'   => $warnings,
 			'core'       => array(
 				'needs_update'    => $core_needs_update,
 				'current_version' => $current_wp_version,
@@ -749,5 +734,28 @@ class ChildManager {
 				'total'   => $core_count + count( $theme_updates ) + count( $plugin_updates ),
 			),
 		);
+	}
+
+	/**
+	 * Run one WordPress update callback safely without failing whole check process.
+	 *
+	 * @param string $callback Callback function.
+	 * @param array  $warnings Warnings collector.
+	 * @return void
+	 */
+	private function run_update_callback_safely( $callback, array &$warnings ) {
+		if ( ! function_exists( $callback ) ) {
+			return;
+		}
+
+		try {
+			call_user_func( $callback );
+		} catch ( \Throwable $runtime_error ) {
+			$warnings[] = sprintf(
+				'%s warning: %s',
+				sanitize_text_field( (string) $callback ),
+				sanitize_text_field( $runtime_error->getMessage() )
+			);
+		}
 	}
 }

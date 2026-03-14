@@ -1748,11 +1748,12 @@ class AdminPages {
 		$result = $this->monitored_items->import_installed_items();
 
 		$message = sprintf(
-			'Scan complete. Added: %d, Skipped: %d, Plugins found: %d, Themes found: %d.',
+			'Scan complete. Added: %d, Synced: %d, Plugins found: %d, Themes found: %d, Needs Update detected: %d.',
 			(int) $result['added'],
-			(int) $result['skipped'],
+			(int) $result['updated'],
 			(int) $result['plugins_found'],
-			(int) $result['themes_found']
+			(int) $result['themes_found'],
+			(int) $result['auto_needs_update']
 		);
 
 		$this->redirect_with_notice( 'rawatwp-monitored-items', $message, '' );
