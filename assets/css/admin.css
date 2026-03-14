@@ -488,6 +488,24 @@
 	background: #fff;
 }
 
+.rawatwp-admin .rawatwp-site-health-item.is-needs-update {
+	border-color: #f0b849;
+	background: #fffaef;
+	box-shadow: inset 3px 0 0 #e0a429;
+}
+
+.rawatwp-admin .rawatwp-site-health-item.is-up-to-date {
+	border-color: #cfe6d6;
+	background: #f6fcf8;
+	box-shadow: inset 3px 0 0 #5da271;
+}
+
+.rawatwp-admin .rawatwp-site-health-item.is-failed {
+	border-color: #f2c0c6;
+	background: #fff6f7;
+	box-shadow: inset 3px 0 0 #d63638;
+}
+
 .rawatwp-admin .rawatwp-site-health-head {
 	display: flex;
 	align-items: center;

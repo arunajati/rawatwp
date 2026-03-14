@@ -523,9 +523,9 @@ class AdminPages {
 					</table>
 				</div>
 
-				<div class="rawatwp-card" id="rawatwp-update-health">
-					<div class="rawatwp-card-header">
-						<h2>Update Health Overview</h2>
+					<div class="rawatwp-card" id="rawatwp-update-health">
+						<div class="rawatwp-card-header">
+							<h2>Update Health Overview</h2>
 						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Run manual core/theme/plugin update check on all connected child sites now?');">
 							<?php wp_nonce_field( 'rawatwp_check_all_site_updates' ); ?>
 							<input type="hidden" name="action" value="rawatwp_check_all_site_updates" />
@@ -533,23 +533,75 @@ class AdminPages {
 						</form>
 					</div>
 					<p class="description">Manual trigger only. RawatWP does not run scheduled auto-update checks.</p>
-					<?php if ( $connected_count <= 0 ) : ?>
-						<p>No connected child sites yet.</p>
-					<?php else : ?>
-						<div class="rawatwp-site-health-list">
-							<?php foreach ( $sites as $site ) : ?>
-								<?php
-								$site_id      = (int) $site['id'];
+						<?php if ( $connected_count <= 0 ) : ?>
+							<p>No connected child sites yet.</p>
+						<?php else : ?>
+							<?php
+							$connected_sites = array();
+							foreach ( $sites as $site ) {
 								$is_connected = isset( $site['connection_status'] ) && 'connected' === sanitize_key( (string) $site['connection_status'] );
 								if ( ! $is_connected ) {
 									continue;
 								}
-								$health = isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ? $health_data_by_site[ $site_id ] : array();
-								?>
-								<div class="rawatwp-site-health-item">
-									<div class="rawatwp-site-health-head">
-										<div>
-											<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
+
+								$site_id = (int) $site['id'];
+								$health  = isset( $health_data_by_site[ $site_id ] ) && is_array( $health_data_by_site[ $site_id ] ) ? $health_data_by_site[ $site_id ] : array();
+
+								$status_key   = isset( $health['status'] ) ? sanitize_key( (string) $health['status'] ) : 'unknown';
+								$needs_total  = isset( $health['counts']['total'] ) ? (int) $health['counts']['total'] : 0;
+								$needs_update = ( 'failed' !== $status_key && $needs_total > 0 );
+
+								$site['_rawatwp_health']           = $health;
+								$site['_rawatwp_health_status']    = $status_key;
+								$site['_rawatwp_health_total']     = $needs_total;
+								$site['_rawatwp_has_needs_update'] = $needs_update;
+
+								$connected_sites[] = $site;
+							}
+
+							usort(
+								$connected_sites,
+								function( $a, $b ) {
+									$a_needs  = ! empty( $a['_rawatwp_has_needs_update'] );
+									$b_needs  = ! empty( $b['_rawatwp_has_needs_update'] );
+									$a_failed = isset( $a['_rawatwp_health_status'] ) && 'failed' === $a['_rawatwp_health_status'];
+									$b_failed = isset( $b['_rawatwp_health_status'] ) && 'failed' === $b['_rawatwp_health_status'];
+
+									$a_rank = $a_needs ? 0 : ( $a_failed ? 1 : 2 );
+									$b_rank = $b_needs ? 0 : ( $b_failed ? 1 : 2 );
+									if ( $a_rank !== $b_rank ) {
+										return $a_rank <=> $b_rank;
+									}
+
+									$a_name = isset( $a['site_name'] ) ? sanitize_text_field( (string) $a['site_name'] ) : '';
+									$b_name = isset( $b['site_name'] ) ? sanitize_text_field( (string) $b['site_name'] ) : '';
+
+									return strcasecmp( $a_name, $b_name );
+								}
+							);
+							?>
+							<div class="rawatwp-site-health-list">
+								<?php foreach ( $connected_sites as $site ) : ?>
+									<?php
+									$site_id      = (int) $site['id'];
+									$health       = isset( $site['_rawatwp_health'] ) && is_array( $site['_rawatwp_health'] ) ? $site['_rawatwp_health'] : array();
+									$status_key   = isset( $site['_rawatwp_health_status'] ) ? sanitize_key( (string) $site['_rawatwp_health_status'] ) : '';
+									$needs_total  = isset( $site['_rawatwp_health_total'] ) ? (int) $site['_rawatwp_health_total'] : 0;
+									$needs_update = ! empty( $site['_rawatwp_has_needs_update'] );
+
+									$item_classes = array( 'rawatwp-site-health-item' );
+									if ( $needs_update ) {
+										$item_classes[] = 'is-needs-update';
+									} elseif ( 'failed' === $status_key ) {
+										$item_classes[] = 'is-failed';
+									} else {
+										$item_classes[] = 'is-up-to-date';
+									}
+									?>
+									<div class="<?php echo esc_attr( implode( ' ', $item_classes ) ); ?>">
+										<div class="rawatwp-site-health-head">
+											<div>
+												<strong><?php echo esc_html( $site['site_name'] . ' (' . $site['site_url'] . ')' ); ?></strong>
 										</div>
 									</div>
 								<?php if ( empty( $health ) ) : ?>
@@ -583,8 +635,8 @@ class AdminPages {
 										);
 										?>
 									</p>
-									<?php if ( ! empty( $health['counts']['total'] ) ) : ?>
-										<ul class="rawatwp-site-health-update-list">
+										<?php if ( $needs_total > 0 ) : ?>
+											<ul class="rawatwp-site-health-update-list">
 												<?php if ( ! empty( $health['core']['needs_update'] ) ) : ?>
 													<li><strong>Core:</strong> <?php echo esc_html( (string) $health['core']['current_version'] ); ?> -> <?php echo esc_html( (string) $health['core']['latest_version'] ); ?></li>
 												<?php endif; ?>
