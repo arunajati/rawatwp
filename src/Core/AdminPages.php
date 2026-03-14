@@ -1660,15 +1660,58 @@ class AdminPages {
 						var packageChecks = document.querySelectorAll('.rawatwp-package-check');
 						var workerBusy = false;
 
+						function ensureInlineOverlay() {
+							var overlay = document.getElementById('rawatwp-loading-overlay');
+							if (overlay) {
+								return overlay;
+							}
+
+							overlay = document.createElement('div');
+							overlay.id = 'rawatwp-loading-overlay';
+							overlay.className = 'rawatwp-loading-overlay';
+							overlay.setAttribute('aria-hidden', 'true');
+							overlay.innerHTML = '' +
+								'<div class="rawatwp-loading-card" role="status" aria-live="polite">' +
+									'<span class="rawatwp-loading-spinner" aria-hidden="true"></span>' +
+									'<div class="rawatwp-loading-content">' +
+										'<strong>Please wait</strong>' +
+										'<span class="rawatwp-loading-message">Processing your request...</span>' +
+									'</div>' +
+								'</div>';
+							document.body.appendChild(overlay);
+							return overlay;
+						}
+
 						function setLoadingOverlay(show, message) {
+							var finalMessage = message || 'Processing your request...';
+							window.rawatwpLoadingState = {
+								show: !!show,
+								message: finalMessage
+							};
+
+							var overlay = ensureInlineOverlay();
+							if (overlay) {
+								var msgNode = overlay.querySelector('.rawatwp-loading-message');
+								if (msgNode) {
+									msgNode.textContent = finalMessage;
+								}
+								if (show) {
+									overlay.classList.add('is-active');
+									overlay.setAttribute('aria-hidden', 'false');
+								} else {
+									overlay.classList.remove('is-active');
+									overlay.setAttribute('aria-hidden', 'true');
+								}
+							}
+
 							window.dispatchEvent(new CustomEvent('rawatwp:loading', {
 								detail: {
 									show: !!show,
-									message: message || 'Processing your request...'
+									message: finalMessage
 								}
 							}));
 							if (typeof window.rawatwpSetLoadingOverlay === 'function') {
-								window.rawatwpSetLoadingOverlay(!!show, message || 'Processing your request...');
+								window.rawatwpSetLoadingOverlay(!!show, finalMessage);
 							}
 						}
 

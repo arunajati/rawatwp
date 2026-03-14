@@ -276,6 +276,11 @@
 		ensureLoadingOverlay();
 		exposeLoadingOverlayApi();
 		bindLoadingForms();
+
+		if (window.rawatwpLoadingState && typeof window.rawatwpLoadingState === 'object') {
+			setLoadingOverlayState(Boolean(window.rawatwpLoadingState.show), window.rawatwpLoadingState.message || 'Processing your request...');
+		}
+
 		window.addEventListener('pageshow', function() {
 			if (window.rawatwpLoadingLock) {
 				return;
