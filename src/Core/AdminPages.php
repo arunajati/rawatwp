@@ -949,14 +949,15 @@ class AdminPages {
 					var cancelRequested = false;
 					var toastTimer = null;
 
-					function setOverlayState(show, message) {
+					function setOverlayState(show, message, showQueueNote) {
 						if (typeof window.rawatwpSetLoadingOverlay === 'function') {
-							window.rawatwpSetLoadingOverlay(show, message || 'Processing your request...');
+							window.rawatwpSetLoadingOverlay(show, message || 'Processing your request...', showQueueNote);
 						}
 						window.dispatchEvent(new CustomEvent('rawatwp:loading', {
 							detail: {
 								show: !!show,
-								message: message || 'Processing your request...'
+								message: message || 'Processing your request...',
+								showQueueNote: typeof showQueueNote === 'boolean' ? showQueueNote : undefined
 							}
 						}));
 					}
@@ -1361,7 +1362,7 @@ class AdminPages {
 							xhr.upload.addEventListener('load', function() {
 								lastActivity = Date.now();
 								if (malwareScanEnabled) {
-									setOverlayState(true, 'Checking package safety... Please do not close this page until the check is complete.');
+									setOverlayState(true, 'Checking package safety... Please do not close this page until the check is complete.', false);
 								}
 								updateUploadRow(row, 100, 'Validating...', 'validating');
 							});
@@ -1399,7 +1400,7 @@ class AdminPages {
 									message = parseErrorMessage(xhr);
 								}
 								if (malwareScanEnabled) {
-									setOverlayState(false, 'Processing your request...');
+									setOverlayState(false, 'Processing your request...', false);
 								}
 
 								if (ok) {
@@ -1420,7 +1421,7 @@ class AdminPages {
 								finished++;
 								failed++;
 								if (malwareScanEnabled) {
-									setOverlayState(false, 'Processing your request...');
+									setOverlayState(false, 'Processing your request...', false);
 								}
 								updateUploadRow(row, progressValue, 'Upload failed: network error.', 'failed');
 								refreshSummary();
@@ -1433,7 +1434,7 @@ class AdminPages {
 								finished++;
 								failed++;
 								if (malwareScanEnabled) {
-									setOverlayState(false, 'Processing your request...');
+									setOverlayState(false, 'Processing your request...', false);
 								}
 								if (cancelRequested) {
 									updateUploadRow(row, progressValue, 'Upload canceled by user.', 'failed');
@@ -1450,7 +1451,7 @@ class AdminPages {
 								finished++;
 								failed++;
 								if (malwareScanEnabled) {
-									setOverlayState(false, 'Processing your request...');
+									setOverlayState(false, 'Processing your request...', false);
 								}
 								updateUploadRow(row, progressValue, 'Upload timeout: server did not respond in time.', 'failed');
 								refreshSummary();
@@ -1790,11 +1791,12 @@ class AdminPages {
 							return overlay;
 						}
 
-						function setLoadingOverlay(show, message) {
+						function setLoadingOverlay(show, message, showQueueNote) {
 							var finalMessage = message || 'Processing your request...';
 							window.rawatwpLoadingState = {
 								show: !!show,
-								message: finalMessage
+								message: finalMessage,
+								showQueueNote: typeof showQueueNote === 'boolean' ? showQueueNote : undefined
 							};
 
 							var overlay = ensureInlineOverlay();
@@ -1805,8 +1807,8 @@ class AdminPages {
 									msgNode.textContent = finalMessage;
 								}
 								if (noteNode) {
-									var showQueueNote = !!window.rawatwpLoadingLock;
-									noteNode.hidden = !showQueueNote;
+									var shouldShowQueueNote = typeof showQueueNote === 'boolean' ? showQueueNote : !!window.rawatwpLoadingLock;
+									noteNode.hidden = !shouldShowQueueNote;
 								}
 								if (show) {
 									overlay.classList.add('is-active');
@@ -1820,11 +1822,12 @@ class AdminPages {
 							window.dispatchEvent(new CustomEvent('rawatwp:loading', {
 								detail: {
 									show: !!show,
-									message: finalMessage
+									message: finalMessage,
+									showQueueNote: typeof showQueueNote === 'boolean' ? showQueueNote : undefined
 								}
 							}));
 							if (typeof window.rawatwpSetLoadingOverlay === 'function') {
-								window.rawatwpSetLoadingOverlay(!!show, finalMessage);
+								window.rawatwpSetLoadingOverlay(!!show, finalMessage, showQueueNote);
 							}
 						}
 
@@ -1953,10 +1956,31 @@ class AdminPages {
 								credentials: 'same-origin',
 								body: formData
 							})
-							.then(function() {
-								setTimeout(function() {
-									window.location.reload();
-								}, 900);
+							.then(function(response) {
+								return response.json();
+							})
+							.then(function(payload) {
+								var data = payload && payload.success && payload.data ? payload.data : {};
+								var counts = data.counts || {};
+								var processed = Number(data.processed || 0);
+								var remaining = Number(counts.on_queue || 0) + Number(counts.processing || 0);
+
+								if (remaining > 0) {
+									setTimeout(function() {
+										window.location.reload();
+									}, 900);
+									return;
+								}
+
+								window.rawatwpLoadingLock = false;
+								if (processed > 0) {
+									setLoadingOverlay(true, 'Finalizing update progress...');
+									setTimeout(function() {
+										window.location.reload();
+									}, 500);
+									return;
+								}
+								setLoadingOverlay(false, 'Processing your request...');
 							})
 							.catch(function() {
 								workerBusy = false;
@@ -1972,9 +1996,6 @@ class AdminPages {
 							window.rawatwpLoadingLock = true;
 							setLoadingOverlay(true, currentOverlayMessage());
 							setTimeout(runBrowserWorkerStep, 500);
-							setTimeout(function() {
-								window.location.reload();
-							}, 12000);
 						} else {
 							window.rawatwpLoadingLock = false;
 						}

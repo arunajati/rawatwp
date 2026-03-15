@@ -210,7 +210,7 @@
 		return overlay;
 	}
 
-	function setLoadingOverlayState(show, message) {
+	function setLoadingOverlayState(show, message, showQueueNote) {
 		var overlay = ensureLoadingOverlay();
 		var messageNode = overlay.querySelector('.rawatwp-loading-message');
 		var noteNode = overlay.querySelector('.rawatwp-loading-note');
@@ -219,7 +219,11 @@
 			messageNode.textContent = String(message);
 		}
 		if (noteNode) {
-			noteNode.hidden = !window.rawatwpLoadingLock;
+			if (typeof showQueueNote === 'boolean') {
+				noteNode.hidden = !showQueueNote;
+			} else {
+				noteNode.hidden = !window.rawatwpLoadingLock;
+			}
 		}
 
 		if (show) {
@@ -237,9 +241,9 @@
 			return;
 		}
 
-		window.rawatwpSetLoadingOverlay = function(show, message) {
+		window.rawatwpSetLoadingOverlay = function(show, message, showQueueNote) {
 			var applyState = function() {
-				setLoadingOverlayState(show, message);
+				setLoadingOverlayState(show, message, showQueueNote);
 			};
 
 			if (document.body) {
@@ -283,7 +287,11 @@
 		bindLoadingForms();
 
 		if (window.rawatwpLoadingState && typeof window.rawatwpLoadingState === 'object') {
-			setLoadingOverlayState(Boolean(window.rawatwpLoadingState.show), window.rawatwpLoadingState.message || 'Processing your request...');
+			setLoadingOverlayState(
+				Boolean(window.rawatwpLoadingState.show),
+				window.rawatwpLoadingState.message || 'Processing your request...',
+				typeof window.rawatwpLoadingState.showQueueNote === 'boolean' ? window.rawatwpLoadingState.showQueueNote : undefined
+			);
 		}
 
 		window.addEventListener('pageshow', function() {
@@ -297,7 +305,8 @@
 			var detail = event && event.detail ? event.detail : {};
 			var show = Boolean(detail.show);
 			var message = detail.message || 'Processing your request...';
-			setLoadingOverlayState(show, message);
+			var showQueueNote = typeof detail.showQueueNote === 'boolean' ? detail.showQueueNote : undefined;
+			setLoadingOverlayState(show, message, showQueueNote);
 		});
 	}
 
