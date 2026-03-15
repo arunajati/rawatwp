@@ -16,13 +16,6 @@ class PackageManager {
 	const OPTION_MALWARE_SCAN_ENABLED = 'rawatwp_malware_scan_enabled';
 
 	/**
-	 * Malware scan provider API key.
-	 *
-	 * Note: keep server-side only. Never expose to browser.
-	 */
-	const MALWARE_SCAN_API_KEY = 'baaf2c76a84a9452f1b7d911e1bb4338f330efaab5e03c07d8d9a0f9181b3a08';
-
-	/**
 	 * Malware scan upload endpoint.
 	 */
 	const MALWARE_SCAN_UPLOAD_ENDPOINT = 'https://www.virustotal.com/api/v3/files';
@@ -696,8 +689,16 @@ class PackageManager {
 			return true;
 		}
 
-		$api_key = trim( (string) self::MALWARE_SCAN_API_KEY );
+		$api_key = $this->get_malware_scan_api_key();
 		if ( '' === $api_key ) {
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan skipped because scanner API key is not configured on server.',
+				)
+			);
 			return true;
 		}
 		if ( ! function_exists( 'curl_init' ) || ! class_exists( '\CURLFile' ) ) {
@@ -915,6 +916,37 @@ class PackageManager {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Get malware scan API key from server-side secret.
+	 *
+	 * Priority:
+	 * 1) WP constant RAWATWP_MALWARE_SCAN_API_KEY
+	 * 2) Environment variable RAWATWP_MALWARE_SCAN_API_KEY
+	 * 3) $_SERVER['RAWATWP_MALWARE_SCAN_API_KEY']
+	 *
+	 * @return string
+	 */
+	private function get_malware_scan_api_key() {
+		$key = '';
+
+		if ( defined( 'RAWATWP_MALWARE_SCAN_API_KEY' ) ) {
+			$key = (string) constant( 'RAWATWP_MALWARE_SCAN_API_KEY' );
+		}
+
+		if ( '' === trim( $key ) ) {
+			$env = getenv( 'RAWATWP_MALWARE_SCAN_API_KEY' );
+			if ( is_string( $env ) ) {
+				$key = $env;
+			}
+		}
+
+		if ( '' === trim( $key ) && isset( $_SERVER['RAWATWP_MALWARE_SCAN_API_KEY'] ) ) {
+			$key = (string) $_SERVER['RAWATWP_MALWARE_SCAN_API_KEY'];
+		}
+
+		return trim( preg_replace( '/\s+/', '', (string) $key ) );
 	}
 
 	/**
