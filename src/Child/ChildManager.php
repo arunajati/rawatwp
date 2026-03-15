@@ -105,12 +105,23 @@ class ChildManager {
 	 *
 	 * @param string $master_url Master URL.
 	 * @param string $security_key Security key.
-	 * @return bool
+	 * @return bool|\WP_Error
 	 */
 	public function save_settings( $master_url, $security_key ) {
 		$settings = $this->get_settings();
 
-		$settings['master_url']   = esc_url_raw( trim( (string) $master_url ) );
+		$master_url = esc_url_raw( trim( (string) $master_url ) );
+		$parts      = wp_parse_url( $master_url );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
+			return new \WP_Error( 'rawatwp_invalid_master_url', __( 'Master URL is invalid. Please use full URL such as https://master-site.com.', 'rawatwp' ) );
+		}
+
+		$scheme = strtolower( (string) $parts['scheme'] );
+		if ( ! in_array( $scheme, array( 'http', 'https' ), true ) ) {
+			return new \WP_Error( 'rawatwp_invalid_master_url_scheme', __( 'Master URL must start with http:// or https://.', 'rawatwp' ) );
+		}
+
+		$settings['master_url']   = $master_url;
 		$settings['security_key'] = sanitize_text_field( $security_key );
 		$settings['connected']    = false;
 		$settings['child_id']     = 0;

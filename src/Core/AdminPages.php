@@ -1963,7 +1963,10 @@ class AdminPages {
 		$master_url   = isset( $_POST['master_url'] ) ? wp_unslash( $_POST['master_url'] ) : '';
 		$security_key = isset( $_POST['security_key'] ) ? wp_unslash( $_POST['security_key'] ) : '';
 
-		$this->child_manager->save_settings( $master_url, $security_key );
+		$saved = $this->child_manager->save_settings( $master_url, $security_key );
+		if ( is_wp_error( $saved ) ) {
+			$this->redirect_with_notice( 'rawatwp-connection', '', $saved->get_error_message() );
+		}
 		$result = $this->child_manager->connect_to_master();
 		if ( is_wp_error( $result ) ) {
 			$this->redirect_with_notice( 'rawatwp-connection', '', $result->get_error_message() );

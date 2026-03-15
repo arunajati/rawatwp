@@ -180,9 +180,22 @@ class Database {
 		}
 
 		$url = esc_url_raw( $url );
-		$url = untrailingslashit( strtolower( $url ) );
+		if ( '' === $url ) {
+			return '';
+		}
 
-		return $url;
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['scheme'] ) || empty( $parts['host'] ) ) {
+			return '';
+		}
+
+		$scheme = strtolower( (string) $parts['scheme'] );
+		$host   = strtolower( (string) $parts['host'] );
+		$port   = isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '';
+		$path   = isset( $parts['path'] ) ? '/' . ltrim( (string) $parts['path'], '/' ) : '';
+		$path   = '/' === $path ? '' : untrailingslashit( $path );
+
+		return "{$scheme}://{$host}{$port}{$path}";
 	}
 
 	/**

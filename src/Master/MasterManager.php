@@ -79,6 +79,16 @@ class MasterManager {
 			return new \WP_Error( 'rawatwp_bad_site_data', __( 'Site name and URL are required.', 'rawatwp' ) );
 		}
 
+		$site_parts = wp_parse_url( $site_url );
+		if ( ! is_array( $site_parts ) || empty( $site_parts['scheme'] ) || empty( $site_parts['host'] ) ) {
+			return new \WP_Error( 'rawatwp_bad_site_url', __( 'Child URL is invalid. Please use full URL such as https://example.com.', 'rawatwp' ) );
+		}
+
+		$site_scheme = strtolower( (string) $site_parts['scheme'] );
+		if ( ! in_array( $site_scheme, array( 'http', 'https' ), true ) ) {
+			return new \WP_Error( 'rawatwp_bad_site_url_scheme', __( 'Child URL must start with http:// or https://.', 'rawatwp' ) );
+		}
+
 		if ( $this->database->get_site_by_url( $site_url ) ) {
 			return new \WP_Error( 'rawatwp_site_exists', __( 'Site is already registered.', 'rawatwp' ) );
 		}
