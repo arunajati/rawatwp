@@ -825,13 +825,9 @@ body.rawatwp-modal-open {
 .rawatwp-loading-note {
 	display: block;
 	margin-top: 8px;
-	padding: 8px 10px;
-	border-left: 3px solid #dba617;
-	background: #fff8e5;
-	border-radius: 6px;
 	font-size: 12px;
 	line-height: 1.4;
-	color: #1d2327;
+	color: #50575e;
 }
 
 @keyframes rawatwp-spin {

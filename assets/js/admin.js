@@ -201,9 +201,9 @@
 			'<div class="rawatwp-loading-card" role="status" aria-live="polite">' +
 				'<span class="rawatwp-loading-spinner" aria-hidden="true"></span>' +
 				'<div class="rawatwp-loading-content">' +
-					'<strong>Please wait</strong>' +
+					'<strong>Please wait,</strong>' +
 					'<span class="rawatwp-loading-message">Processing your request...</span>' +
-					'<span class="rawatwp-loading-note" hidden><strong>Important:</strong> Do not close this page while update queue is processing.</span>' +
+					'<span class="rawatwp-loading-note" hidden>Do not close this page while update queue is processing.</span>' +
 				'</div>' +
 			'</div>';
 		document.body.appendChild(overlay);
