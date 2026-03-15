@@ -203,6 +203,7 @@
 				'<div class="rawatwp-loading-content">' +
 					'<strong>Please wait</strong>' +
 					'<span class="rawatwp-loading-message">Processing your request...</span>' +
+					'<span class="rawatwp-loading-note" hidden><strong>Important:</strong> Do not close this page while update queue is processing.</span>' +
 				'</div>' +
 			'</div>';
 		document.body.appendChild(overlay);
@@ -212,9 +213,13 @@
 	function setLoadingOverlayState(show, message) {
 		var overlay = ensureLoadingOverlay();
 		var messageNode = overlay.querySelector('.rawatwp-loading-message');
+		var noteNode = overlay.querySelector('.rawatwp-loading-note');
 
 		if (messageNode && message) {
 			messageNode.textContent = String(message);
+		}
+		if (noteNode) {
+			noteNode.hidden = !window.rawatwpLoadingLock;
 		}
 
 		if (show) {

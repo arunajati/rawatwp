@@ -1567,7 +1567,6 @@ class AdminPages {
 								<?php submit_button( 'Clear Progress', 'secondary', 'submit', false ); ?>
 							</form>
 						</div>
-						<p class="rawatwp-progress-warning"><strong>Important:</strong> Do not close this page while update queue is processing.</p>
 						<p class="description">Auto-clean is active: completed progress rows older than 30 days are removed, and total completed rows are capped at 10,000.</p>
 						<table class="widefat striped">
 						<thead>
@@ -1676,6 +1675,7 @@ class AdminPages {
 									'<div class="rawatwp-loading-content">' +
 										'<strong>Please wait</strong>' +
 										'<span class="rawatwp-loading-message">Processing your request...</span>' +
+										'<span class="rawatwp-loading-note" hidden><strong>Important:</strong> Do not close this page while update queue is processing.</span>' +
 									'</div>' +
 								'</div>';
 							document.body.appendChild(overlay);
@@ -1692,8 +1692,13 @@ class AdminPages {
 							var overlay = ensureInlineOverlay();
 							if (overlay) {
 								var msgNode = overlay.querySelector('.rawatwp-loading-message');
+								var noteNode = overlay.querySelector('.rawatwp-loading-note');
 								if (msgNode) {
 									msgNode.textContent = finalMessage;
+								}
+								if (noteNode) {
+									var showQueueNote = !!window.rawatwpLoadingLock;
+									noteNode.hidden = !showQueueNote;
 								}
 								if (show) {
 									overlay.classList.add('is-active');

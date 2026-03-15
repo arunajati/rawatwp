@@ -596,15 +596,6 @@
 	font-size: 12px;
 }
 
-.rawatwp-admin .rawatwp-progress-warning {
-	margin: 0 0 var(--rawatwp-space-1);
-	padding: 10px 12px;
-	border-left: 3px solid #dba617;
-	background: #fff8e5;
-	border-radius: 6px;
-}
-
-
 body.rawatwp-modal-open {
 	overflow: hidden;
 }
@@ -829,6 +820,18 @@ body.rawatwp-modal-open {
 	line-height: 1.45;
 	color: #50575e;
 	overflow-wrap: anywhere;
+}
+
+.rawatwp-loading-note {
+	display: block;
+	margin-top: 8px;
+	padding: 8px 10px;
+	border-left: 3px solid #dba617;
+	background: #fff8e5;
+	border-radius: 6px;
+	font-size: 12px;
+	line-height: 1.4;
+	color: #1d2327;
 }
 
 @keyframes rawatwp-spin {
