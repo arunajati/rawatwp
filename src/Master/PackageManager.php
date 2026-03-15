@@ -1,6 +1,7 @@
 <?php
 namespace RawatWP\Master;
 
+use RawatWP\Config\EmbeddedSecrets;
 use RawatWP\Core\Database;
 use RawatWP\Core\Logger;
 use RawatWP\Core\SecurityManager;
@@ -919,19 +920,38 @@ class PackageManager {
 	}
 
 	/**
-	 * Get malware scan API key from server-side secret.
+	 * Get malware scan API key.
 	 *
 	 * Priority:
-	 * 1) WP constant RAWATWP_MALWARE_SCAN_API_KEY
-	 * 2) Environment variable RAWATWP_MALWARE_SCAN_API_KEY
-	 * 3) $_SERVER['RAWATWP_MALWARE_SCAN_API_KEY']
+	 * 1) Internal encrypted key bundled in plugin (default).
+	 * 2) WP constant RAWATWP_MALWARE_SCAN_API_KEY.
+	 * 3) Environment variable RAWATWP_MALWARE_SCAN_API_KEY.
+	 * 4) $_SERVER['RAWATWP_MALWARE_SCAN_API_KEY'].
 	 *
 	 * @return string
 	 */
 	private function get_malware_scan_api_key() {
-		$key = '';
+		$key  = '';
+		$seed = EmbeddedSecrets::get_malware_scan_seed();
 
-		if ( defined( 'RAWATWP_MALWARE_SCAN_API_KEY' ) ) {
+		if ( ! empty( $seed['iv'] ) && ! empty( $seed['cipher'] ) && function_exists( 'openssl_decrypt' ) ) {
+			$iv         = base64_decode( (string) $seed['iv'], true );
+			$ciphertext = base64_decode( (string) $seed['cipher'], true );
+			if ( false !== $iv && false !== $ciphertext && 16 === strlen( $iv ) ) {
+				$decrypted = openssl_decrypt(
+					$ciphertext,
+					'AES-256-CBC',
+					$this->get_malware_scan_bootstrap_phrase(),
+					OPENSSL_RAW_DATA,
+					$iv
+				);
+				if ( is_string( $decrypted ) && '' !== trim( $decrypted ) ) {
+					$key = $decrypted;
+				}
+			}
+		}
+
+		if ( '' === trim( $key ) && defined( 'RAWATWP_MALWARE_SCAN_API_KEY' ) ) {
 			$key = (string) constant( 'RAWATWP_MALWARE_SCAN_API_KEY' );
 		}
 
@@ -947,6 +967,23 @@ class PackageManager {
 		}
 
 		return trim( preg_replace( '/\s+/', '', (string) $key ) );
+	}
+
+	/**
+	 * Build decryption phrase for bundled malware scan API key.
+	 *
+	 * @return string
+	 */
+	private function get_malware_scan_bootstrap_phrase() {
+		$parts = array(
+			'rwP',
+			'scan',
+			'seed',
+			'26',
+			'X9m!',
+		);
+
+		return implode( '|', $parts );
 	}
 
 	/**
