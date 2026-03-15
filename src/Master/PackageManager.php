@@ -11,6 +11,28 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class PackageManager {
 	/**
+	 * Option key: malware scan enabled.
+	 */
+	const OPTION_MALWARE_SCAN_ENABLED = 'rawatwp_malware_scan_enabled';
+
+	/**
+	 * Malware scan provider API key.
+	 *
+	 * Note: keep server-side only. Never expose to browser.
+	 */
+	const MALWARE_SCAN_API_KEY = 'baaf2c76a84a9452f1b7d911e1bb4338f330efaab5e03c07d8d9a0f9181b3a08';
+
+	/**
+	 * Malware scan upload endpoint.
+	 */
+	const MALWARE_SCAN_UPLOAD_ENDPOINT = 'https://www.virustotal.com/api/v3/files';
+
+	/**
+	 * Malware scan analysis endpoint.
+	 */
+	const MALWARE_SCAN_ANALYSIS_ENDPOINT = 'https://www.virustotal.com/api/v3/analyses/';
+
+	/**
 	 * Database.
 	 *
 	 * @var Database
@@ -93,6 +115,18 @@ class PackageManager {
 		$detected           = isset( $prepared['meta'] ) && is_array( $prepared['meta'] ) ? $prepared['meta'] : array();
 		$from_bundle        = ! empty( $prepared['from_bundle'] );
 		$resolved_file_name = isset( $prepared['source_name'] ) ? (string) $prepared['source_name'] : $source_file_name;
+
+		$skip_malware_scan = ! empty( $meta['skip_malware_scan'] );
+		if ( ! $skip_malware_scan && $this->is_malware_scan_enabled() ) {
+			$scan_result = $this->scan_zip_file_for_malware( $working_zip_path, $resolved_file_name );
+			if ( is_wp_error( $scan_result ) ) {
+				if ( $working_zip_path !== $target_temp_path ) {
+					@unlink( $working_zip_path );
+				}
+				@unlink( $target_temp_path );
+				return $scan_result;
+			}
+		}
 
 		$type        = $detected['type'];
 		$target_slug = $detected['target_slug'];
@@ -458,7 +492,12 @@ class PackageManager {
 			'size'     => (int) @filesize( $temp_zip ),
 		);
 
-		$uploaded = $this->upload_package( $file );
+		$uploaded = $this->upload_package(
+			$file,
+			array(
+				'skip_malware_scan' => true,
+			)
+		);
 		@unlink( $temp_zip );
 
 		if ( is_wp_error( $uploaded ) ) {
@@ -477,6 +516,25 @@ class PackageManager {
 		}
 
 		return $uploaded;
+	}
+
+	/**
+	 * Check malware scan toggle state.
+	 *
+	 * @return bool
+	 */
+	public function is_malware_scan_enabled() {
+		return '1' === (string) get_option( self::OPTION_MALWARE_SCAN_ENABLED, '0' );
+	}
+
+	/**
+	 * Set malware scan toggle state.
+	 *
+	 * @param bool $enabled Enabled flag.
+	 * @return bool
+	 */
+	public function set_malware_scan_enabled( $enabled ) {
+		return update_option( self::OPTION_MALWARE_SCAN_ENABLED, $enabled ? '1' : '0', false );
 	}
 
 	/**
@@ -612,6 +670,251 @@ class PackageManager {
 	 */
 	private function get_packages_directory() {
 		return wp_normalize_path( trailingslashit( ABSPATH ) . 'updates' );
+	}
+
+	/**
+	 * Scan one uploaded zip file for malware indications.
+	 *
+	 * Policy:
+	 * - If scan service is unavailable/rate-limited/error: allow upload (fail-open).
+	 * - If scan reports malicious/suspicious: block and delete uploaded file.
+	 *
+	 * @param string $zip_path Zip file path.
+	 * @param string $source_name Source file name.
+	 * @return true|\WP_Error
+	 */
+	private function scan_zip_file_for_malware( $zip_path, $source_name ) {
+		$zip_path    = wp_normalize_path( (string) $zip_path );
+		$source_name = sanitize_file_name( (string) $source_name );
+
+		if ( '' === $zip_path || ! is_file( $zip_path ) || ! is_readable( $zip_path ) ) {
+			return true;
+		}
+
+		$file_size = (int) @filesize( $zip_path );
+		if ( $file_size <= 0 ) {
+			return true;
+		}
+
+		$api_key = trim( (string) self::MALWARE_SCAN_API_KEY );
+		if ( '' === $api_key ) {
+			return true;
+		}
+		if ( ! function_exists( 'curl_init' ) || ! class_exists( '\CURLFile' ) ) {
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan skipped because cURL is not available on this server.',
+				)
+			);
+			return true;
+		}
+
+		$tmp_for_scan = wp_tempnam( 'rawatwp-malware-scan-' . wp_generate_password( 6, false, false ) . '.zip' );
+		if ( ! is_string( $tmp_for_scan ) || '' === $tmp_for_scan ) {
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan skipped because temporary scan file could not be created.',
+				)
+			);
+			return true;
+		}
+		$tmp_for_scan = wp_normalize_path( $tmp_for_scan );
+
+		if ( ! @copy( $zip_path, $tmp_for_scan ) ) {
+			@unlink( $tmp_for_scan );
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan skipped because package copy for scanning failed.',
+					'context' => array(
+						'file_name' => $source_name,
+					),
+				)
+			);
+			return true;
+		}
+
+		$curl = curl_init();
+		curl_setopt_array(
+			$curl,
+			array(
+				CURLOPT_URL            => self::MALWARE_SCAN_UPLOAD_ENDPOINT,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 120,
+				CURLOPT_HTTPHEADER     => array(
+					'x-apikey: ' . $api_key,
+				),
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => array(
+					'file' => new \CURLFile( $tmp_for_scan, 'application/zip', '' !== $source_name ? $source_name : basename( $zip_path ) ),
+				),
+			)
+		);
+		$raw_body  = curl_exec( $curl );
+		$curl_err  = curl_error( $curl );
+		$http_code = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE );
+		curl_close( $curl );
+
+		if ( false === $raw_body || '' !== $curl_err ) {
+			@unlink( $tmp_for_scan );
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan service is unavailable. Upload is allowed.',
+					'context' => array(
+						'file_name' => $source_name,
+						'error'     => $curl_err,
+					),
+				)
+			);
+			return true;
+		}
+
+		$body = json_decode( (string) $raw_body, true );
+		if ( $http_code < 200 || $http_code >= 300 || ! is_array( $body ) || empty( $body['data']['id'] ) ) {
+			@unlink( $tmp_for_scan );
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan could not be completed. Upload is allowed.',
+					'context' => array(
+						'file_name' => $source_name,
+						'http_code' => $http_code,
+					),
+				)
+			);
+			return true;
+		}
+
+		$analysis_id = sanitize_text_field( (string) $body['data']['id'] );
+		$poll_result = $this->poll_malware_scan_result( $analysis_id, $api_key );
+		@unlink( $tmp_for_scan );
+
+		if ( ! is_array( $poll_result ) ) {
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_skipped',
+					'status'  => 'failed',
+					'message' => 'Malware scan result is not available in time. Upload is allowed.',
+					'context' => array(
+						'file_name'   => $source_name,
+						'analysis_id' => $analysis_id,
+					),
+				)
+			);
+			return true;
+		}
+
+		$stats      = isset( $poll_result['stats'] ) && is_array( $poll_result['stats'] ) ? $poll_result['stats'] : array();
+		$malicious  = isset( $stats['malicious'] ) ? (int) $stats['malicious'] : 0;
+		$suspicious = isset( $stats['suspicious'] ) ? (int) $stats['suspicious'] : 0;
+
+		if ( $malicious > 0 || $suspicious > 0 ) {
+			$this->logger->log(
+				array(
+					'mode'    => 'master',
+					'action'  => 'malware_scan_blocked',
+					'status'  => 'failed',
+					'message' => 'Uploaded package was blocked by safety scan and removed.',
+					'context' => array(
+						'file_name'   => $source_name,
+						'analysis_id' => $analysis_id,
+						'stats'       => $stats,
+					),
+				)
+			);
+
+			return new \WP_Error(
+				'rawatwp_malware_detected',
+				'This package appears unsafe and has been removed. Scan results can sometimes be incorrect. RawatWP includes this safety check to help protect your website, but it is not a full antivirus system.'
+			);
+		}
+
+		$this->logger->log(
+			array(
+				'mode'    => 'master',
+				'action'  => 'malware_scan_passed',
+				'status'  => 'success',
+				'message' => 'Uploaded package passed the safety scan.',
+				'context' => array(
+					'file_name'   => $source_name,
+					'analysis_id' => $analysis_id,
+					'stats'       => $stats,
+				),
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Poll malware scan result until completed or timeout.
+	 *
+	 * @param string $analysis_id Analysis ID.
+	 * @param string $api_key API key.
+	 * @return array|null
+	 */
+	private function poll_malware_scan_result( $analysis_id, $api_key ) {
+		$analysis_id = sanitize_text_field( (string) $analysis_id );
+		$api_key     = sanitize_text_field( (string) $api_key );
+		if ( '' === $analysis_id || '' === $api_key ) {
+			return null;
+		}
+
+		$max_attempts = 8;
+		for ( $attempt = 1; $attempt <= $max_attempts; $attempt++ ) {
+			$curl = curl_init();
+			curl_setopt_array(
+				$curl,
+				array(
+					CURLOPT_URL            => self::MALWARE_SCAN_ANALYSIS_ENDPOINT . rawurlencode( $analysis_id ),
+					CURLOPT_RETURNTRANSFER => true,
+					CURLOPT_TIMEOUT        => 45,
+					CURLOPT_HTTPHEADER     => array(
+						'x-apikey: ' . $api_key,
+					),
+				)
+			);
+			$raw_body  = curl_exec( $curl );
+			$curl_err  = curl_error( $curl );
+			$http_code = (int) curl_getinfo( $curl, CURLINFO_RESPONSE_CODE );
+			curl_close( $curl );
+			if ( false === $raw_body || '' !== $curl_err ) {
+				return null;
+			}
+
+			$body = json_decode( (string) $raw_body, true );
+			if ( $http_code < 200 || $http_code >= 300 || ! is_array( $body ) || empty( $body['data']['attributes'] ) || ! is_array( $body['data']['attributes'] ) ) {
+				return null;
+			}
+
+			$attrs  = $body['data']['attributes'];
+			$status = isset( $attrs['status'] ) ? sanitize_key( (string) $attrs['status'] ) : '';
+			if ( 'completed' === $status ) {
+				return array(
+					'stats' => isset( $attrs['stats'] ) && is_array( $attrs['stats'] ) ? $attrs['stats'] : array(),
+				);
+			}
+
+			if ( $attempt < $max_attempts ) {
+				sleep( 2 );
+			}
+		}
+
+		return null;
 	}
 
 	/**

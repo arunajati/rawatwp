@@ -201,6 +201,7 @@ class AdminPages {
 		add_action( 'admin_post_rawatwp_regenerate_runner_token', array( $this, 'handle_regenerate_runner_token' ) );
 
 		add_action( 'wp_ajax_rawatwp_upload_package_item', array( $this, 'handle_ajax_upload_package_item' ) );
+		add_action( 'wp_ajax_rawatwp_toggle_malware_scan', array( $this, 'handle_ajax_toggle_malware_scan' ) );
 		add_action( 'wp_ajax_rawatwp_queue_process_next', array( $this, 'handle_ajax_queue_process_next' ) );
 		add_action( 'wp_ajax_rawatwp_queue_status', array( $this, 'handle_ajax_queue_status' ) );
 	}
@@ -801,12 +802,22 @@ class AdminPages {
 					<p>This page is available only in Master mode.</p>
 				</div>
 			<?php else : ?>
+				<?php $malware_scan_enabled = $this->package_manager->is_malware_scan_enabled(); ?>
 				<div class="rawatwp-card">
+					<div class="rawatwp-card-header">
+						<h2>Choose Package</h2>
+						<label class="rawatwp-switch-wrap" for="rawatwp-malware-scan-toggle">
+							<span class="rawatwp-switch-label">Malware Scan</span>
+							<input id="rawatwp-malware-scan-toggle" class="rawatwp-switch-input" type="checkbox" <?php checked( $malware_scan_enabled ); ?> />
+							<span class="rawatwp-switch-track" aria-hidden="true"></span>
+							<span class="rawatwp-switch-state" id="rawatwp-malware-scan-state"><?php echo $malware_scan_enabled ? 'ON' : 'OFF'; ?></span>
+						</label>
+					</div>
 					<form id="rawatwp-package-upload-form" method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 						<?php wp_nonce_field( 'rawatwp_upload_package' ); ?>
 						<input type="hidden" name="action" value="rawatwp_upload_package" />
 						<div class="rawatwp-upload-stack">
-							<label for="rawatwp-package-zip-input" class="rawatwp-upload-title">Choose Package</label>
+							<label for="rawatwp-package-zip-input" class="rawatwp-upload-title">Select zip file</label>
 							<input id="rawatwp-package-zip-input" type="file" name="package_zip[]" accept=".zip" multiple required />
 							<p id="rawatwp-upload-file-count" class="description"></p>
 							<div id="rawatwp-selected-files" class="rawatwp-selected-files" hidden>
@@ -926,12 +937,47 @@ class AdminPages {
 					var uploadItems = document.getElementById('rawatwp-upload-items');
 					var closeMonitorBtn = document.getElementById('rawatwp-upload-monitor-close');
 					var cancelMonitorBtn = document.getElementById('rawatwp-upload-monitor-cancel');
+					var malwareScanToggle = document.getElementById('rawatwp-malware-scan-toggle');
+					var malwareScanState = document.getElementById('rawatwp-malware-scan-state');
 					var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 					var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'rawatwp_upload_package_item' ) ); ?>;
+					var malwareToggleNonce = <?php echo wp_json_encode( wp_create_nonce( 'rawatwp_toggle_malware_scan' ) ); ?>;
+					var malwareScanEnabled = <?php echo $malware_scan_enabled ? 'true' : 'false'; ?>;
 					var uploadedRows = [];
 					var selectedFiles = [];
 					var activeXhr = null;
 					var cancelRequested = false;
+					var toastTimer = null;
+
+					function setOverlayState(show, message) {
+						if (typeof window.rawatwpSetLoadingOverlay === 'function') {
+							window.rawatwpSetLoadingOverlay(show, message || 'Processing your request...');
+						}
+						window.dispatchEvent(new CustomEvent('rawatwp:loading', {
+							detail: {
+								show: !!show,
+								message: message || 'Processing your request...'
+							}
+						}));
+					}
+
+					function showScanToast(enabled) {
+						var toast = document.getElementById('rawatwp-scan-toast');
+						if (!toast) {
+							toast = document.createElement('div');
+							toast.id = 'rawatwp-scan-toast';
+							toast.className = 'rawatwp-scan-toast';
+							document.body.appendChild(toast);
+						}
+						toast.textContent = enabled ? 'Scanner ON' : 'Scanner OFF';
+						toast.classList.add('is-visible');
+						if (toastTimer) {
+							window.clearTimeout(toastTimer);
+						}
+						toastTimer = window.setTimeout(function() {
+							toast.classList.remove('is-visible');
+						}, 1300);
+					}
 
 					function setSummary(text) {
 						if (uploadSummary) {
@@ -1112,6 +1158,46 @@ class AdminPages {
 						});
 					}
 
+					if (malwareScanToggle) {
+						malwareScanToggle.addEventListener('change', function() {
+							var nextValue = malwareScanToggle.checked;
+							malwareScanToggle.disabled = true;
+
+							var formData = new FormData();
+							formData.append('action', 'rawatwp_toggle_malware_scan');
+							formData.append('_ajax_nonce', malwareToggleNonce);
+							formData.append('enabled', nextValue ? '1' : '0');
+
+							fetch(ajaxUrl, {
+								method: 'POST',
+								credentials: 'same-origin',
+								body: formData
+							})
+							.then(function(response) {
+								return response.json();
+							})
+							.then(function(payload) {
+								if (!payload || !payload.success) {
+									throw new Error(payload && payload.data && payload.data.message ? payload.data.message : 'Failed to update scanner option.');
+								}
+
+								malwareScanEnabled = !!(payload.data && payload.data.enabled);
+								malwareScanToggle.checked = malwareScanEnabled;
+								if (malwareScanState) {
+									malwareScanState.textContent = malwareScanEnabled ? 'ON' : 'OFF';
+								}
+								showScanToast(malwareScanEnabled);
+							})
+							.catch(function(error) {
+								malwareScanToggle.checked = !nextValue;
+								window.alert(error && error.message ? error.message : 'Failed to update scanner option.');
+							})
+							.finally(function() {
+								malwareScanToggle.disabled = false;
+							});
+						});
+					}
+
 					if (checkAll) {
 						checkAll.addEventListener('change', function() {
 							rowChecks.forEach(function(item) {
@@ -1274,6 +1360,9 @@ class AdminPages {
 
 							xhr.upload.addEventListener('load', function() {
 								lastActivity = Date.now();
+								if (malwareScanEnabled) {
+									setOverlayState(true, 'Checking package safety... Please do not close this page until the check is complete.');
+								}
 								updateUploadRow(row, 100, 'Validating...', 'validating');
 							});
 
@@ -1298,9 +1387,19 @@ class AdminPages {
 										message = payload.data && payload.data.message ? payload.data.message : 'Uploaded successfully.';
 									} else {
 										message = payload && payload.data && payload.data.message ? payload.data.message : parseErrorMessage(xhr);
+										if (payload && payload.data && payload.data.malware_detected) {
+											window.alert(
+												'This package appears unsafe and has been removed.\n\n' +
+												'Scan results can sometimes be incorrect.\n' +
+												'RawatWP includes this safety check to help protect your website, but it is not a full antivirus system.'
+											);
+										}
 									}
 								} catch (e) {
 									message = parseErrorMessage(xhr);
+								}
+								if (malwareScanEnabled) {
+									setOverlayState(false, 'Processing your request...');
 								}
 
 								if (ok) {
@@ -1320,6 +1419,9 @@ class AdminPages {
 								activeXhr = null;
 								finished++;
 								failed++;
+								if (malwareScanEnabled) {
+									setOverlayState(false, 'Processing your request...');
+								}
 								updateUploadRow(row, progressValue, 'Upload failed: network error.', 'failed');
 								refreshSummary();
 								uploadFileAt(index + 1);
@@ -1330,6 +1432,9 @@ class AdminPages {
 								activeXhr = null;
 								finished++;
 								failed++;
+								if (malwareScanEnabled) {
+									setOverlayState(false, 'Processing your request...');
+								}
 								if (cancelRequested) {
 									updateUploadRow(row, progressValue, 'Upload canceled by user.', 'failed');
 								} else {
@@ -1344,6 +1449,9 @@ class AdminPages {
 								activeXhr = null;
 								finished++;
 								failed++;
+								if (malwareScanEnabled) {
+									setOverlayState(false, 'Processing your request...');
+								}
 								updateUploadRow(row, progressValue, 'Upload timeout: server did not respond in time.', 'failed');
 								refreshSummary();
 								uploadFileAt(index + 1);
@@ -2418,6 +2526,7 @@ class AdminPages {
 			wp_send_json_error(
 				array(
 					'message' => $result->get_error_message(),
+					'malware_detected' => 'rawatwp_malware_detected' === $result->get_error_code(),
 				),
 				400
 			);
@@ -2427,6 +2536,35 @@ class AdminPages {
 			array(
 				'message' => sprintf( 'Uploaded successfully: %s', '' !== $file_name ? $file_name : 'zip file' ),
 				'package' => is_array( $result ) ? $result : array(),
+			)
+		);
+	}
+
+	/**
+	 * Handle malware scan toggle state (ON/OFF) in packages page.
+	 *
+	 * @return void
+	 */
+	public function handle_ajax_toggle_malware_scan() {
+		$this->assert_admin();
+		check_ajax_referer( 'rawatwp_toggle_malware_scan' );
+
+		if ( 'master' !== $this->mode_manager->get_mode() ) {
+			wp_send_json_error(
+				array(
+					'message' => 'This feature is available only in Master mode.',
+				),
+				403
+			);
+		}
+
+		$enabled = isset( $_POST['enabled'] ) && '1' === (string) wp_unslash( $_POST['enabled'] );
+		$this->package_manager->set_malware_scan_enabled( $enabled );
+
+		wp_send_json_success(
+			array(
+				'enabled' => $enabled,
+				'message' => $enabled ? 'Scanner ON' : 'Scanner OFF',
 			)
 		);
 	}
